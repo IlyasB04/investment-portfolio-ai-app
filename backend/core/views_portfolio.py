@@ -1,9 +1,29 @@
+import hashlib
 from decimal import Decimal
 
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
 
 from .models import Holding, PriceSnapshot
+
+_SYNTHETIC_MIN = Decimal("0.85")
+_SYNTHETIC_RANGE = Decimal("0.50")  # 0.85 + 0.50 = 1.35 max
+
+
+def _synthetic_price(ticker: str, average_cost: Decimal) -> Decimal:
+    """
+    Return a deterministic synthetic price derived from the ticker and average_cost.
+
+    Method: SHA-256 the uppercased ticker, take the first 8 hex digits as an
+    unsigned integer, normalise to [0, 1) by dividing by 0xFFFFFFFF, then scale
+    into [0.85, 1.35].  The result is stable between requests because the hash
+    of a given ticker string never changes.
+    """
+    digest = hashlib.sha256(ticker.upper().encode()).hexdigest()
+    seed = int(digest[:8], 16)
+    ratio = Decimal(seed) / Decimal(0xFFFFFFFF)
+    multiplier = _SYNTHETIC_MIN + ratio * _SYNTHETIC_RANGE
+    return (average_cost * multiplier).quantize(Decimal("0.000001"))
 
 
 @api_view(["GET"])
@@ -19,38 +39,40 @@ def portfolio_summary(request):
 
     positions = []
     for h in holdings:
-        price = latest_prices.get(h.ticker)
-        if price is not None:
-            market_value = h.quantity * price
-            pnl = (price - h.average_cost) * h.quantity
+        real_price = latest_prices.get(h.ticker)
+        if real_price is not None:
+            price = real_price
+            is_synthetic = False
         else:
-            market_value = None
-            pnl = None
+            price = _synthetic_price(h.ticker, h.average_cost)
+            is_synthetic = True
+        market_value = h.quantity * price
+        pnl = (price - h.average_cost) * h.quantity
         positions.append({
             "id": h.id,
             "ticker": h.ticker,
             "quantity": str(h.quantity),
             "average_cost": str(h.average_cost),
-            "price": str(price) if price is not None else None,
-            "market_value": str(market_value) if market_value is not None else None,
-            "pnl": str(pnl) if pnl is not None else None,
+            "price": str(price),
+            "market_value": str(market_value),
+            "pnl": str(pnl),
+            "is_synthetic_price": is_synthetic,
         })
 
     total_value = sum(
-        (Decimal(p["market_value"]) for p in positions if p["market_value"] is not None),
+        (Decimal(p["market_value"]) for p in positions),
         Decimal(0),
     )
 
     allocation = []
     if total_value > 0:
         for p in positions:
-            if p["market_value"] is not None:
-                pct = Decimal(p["market_value"]) / total_value * 100
-                allocation.append({
-                    "ticker": p["ticker"],
-                    "market_value": p["market_value"],
-                    "percent_of_portfolio": str(round(pct, 6)),
-                })
+            pct = Decimal(p["market_value"]) / total_value * 100
+            allocation.append({
+                "ticker": p["ticker"],
+                "market_value": p["market_value"],
+                "percent_of_portfolio": str(round(pct, 6)),
+            })
         allocation.sort(key=lambda x: Decimal(x["percent_of_portfolio"]), reverse=True)
 
     percents = [float(a["percent_of_portfolio"]) for a in allocation]

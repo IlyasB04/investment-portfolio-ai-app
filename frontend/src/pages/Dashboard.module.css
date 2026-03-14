@@ -311,3 +311,8 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.synthetic {
+  color: var(--text-muted);
+  font-style: italic;
+}

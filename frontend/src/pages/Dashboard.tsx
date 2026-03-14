@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import client from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import TradeModal from "./TradeModal";
+import PortfolioValueChart from "./PortfolioValueChart";
 import styles from "./Dashboard.module.css";
 
 interface Position {
@@ -9,9 +10,10 @@ interface Position {
   ticker: string;
   quantity: string;
   average_cost: string;
-  price: string | null;
-  market_value: string | null;
-  pnl: string | null;
+  price: string;
+  market_value: string;
+  pnl: string;
+  is_synthetic_price: boolean;
 }
 
 interface Allocation {
@@ -146,15 +148,13 @@ export default function Dashboard() {
                         <td className={styles.right}>{fmt(p.quantity, 4)}</td>
                         <td className={styles.right}>${fmt(p.average_cost)}</td>
                         <td className={styles.right}>
-                          {p.price ? `$${fmt(p.price)}` : "—"}
+                          <span className={p.is_synthetic_price ? styles.synthetic : undefined}>
+                            ${fmt(p.price)}
+                          </span>
                         </td>
-                        <td className={styles.right}>
-                          {p.market_value ? `$${fmt(p.market_value)}` : "—"}
-                        </td>
+                        <td className={styles.right}>${fmt(p.market_value)}</td>
                         <td className={`${styles.right} ${pnlClass(p.pnl)}`}>
-                          {p.pnl
-                            ? `${parseFloat(p.pnl) >= 0 ? "+" : ""}$${fmt(p.pnl)}`
-                            : "—"}
+                          {parseFloat(p.pnl) >= 0 ? "+" : ""}${fmt(p.pnl)}
                         </td>
                         <td className={styles.actionCell}>
                           <button
@@ -171,6 +171,9 @@ export default function Dashboard() {
                 </table>
               </div>
             </section>
+
+            {/* Portfolio Value Chart */}
+            <PortfolioValueChart positions={summary.positions} />
 
             {/* Allocation + Concentration */}
             <div className={styles.row}>
