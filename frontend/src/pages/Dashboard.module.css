@@ -1,0 +1,253 @@
+.page {
+  min-height: 100vh;
+  background: var(--bg-base);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top bar ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.logout {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.logout:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* ── Main ── */
+.main {
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 36px 28px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.loading,
+.error {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.error {
+  color: var(--negative);
+}
+
+/* ── Hero value ── */
+.hero {
+  padding: 32px 28px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.heroLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 8px;
+}
+
+.heroValue {
+  font-size: 42px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--mono);
+  letter-spacing: -1px;
+  margin: 0;
+}
+
+/* ── Section ── */
+.section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 24px 28px;
+  flex: 1;
+}
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 20px;
+}
+
+/* ── Table ── */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table thead tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0 12px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  font-family: var(--mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover td {
+  background: color-mix(in srgb, var(--border) 25%, transparent);
+}
+
+.ticker {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+  font-family: var(--mono) !important;
+}
+
+.right {
+  text-align: right !important;
+}
+
+.positive {
+  color: var(--positive) !important;
+}
+
+.negative {
+  color: var(--negative) !important;
+}
+
+/* ── Side-by-side row ── */
+.row {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Allocation ── */
+.allocationList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.allocationRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.allocationMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.allocationPct {
+  font-size: 13px;
+  font-family: var(--mono);
+  color: var(--text-secondary);
+}
+
+.barTrack {
+  height: 4px;
+  background: color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+/* ── Concentration ── */
+.concGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.concCard {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.concLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 8px;
+}
+
+.concValue {
+  font-size: 24px;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
