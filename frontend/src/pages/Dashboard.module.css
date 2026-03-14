@@ -272,3 +272,42 @@
   margin: 0;
   letter-spacing: -0.5px;
 }
+
+/* ── Delete ── */
+.deleteError {
+  font-size: 13px;
+  color: var(--negative);
+  background: color-mix(in srgb, var(--negative) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--negative) 25%, transparent);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0 0 16px;
+}
+
+.actionCell {
+  text-align: right;
+  padding-right: 4px !important;
+}
+
+.deleteBtn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--sans);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.deleteBtn:hover:not(:disabled) {
+  color: var(--negative);
+  border-color: color-mix(in srgb, var(--negative) 40%, transparent);
+}
+
+.deleteBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

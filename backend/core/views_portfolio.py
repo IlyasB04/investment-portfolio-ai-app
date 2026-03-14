@@ -27,6 +27,7 @@ def portfolio_summary(request):
             market_value = None
             pnl = None
         positions.append({
+            "id": h.id,
             "ticker": h.ticker,
             "quantity": str(h.quantity),
             "average_cost": str(h.average_cost),

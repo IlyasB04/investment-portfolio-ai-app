@@ -5,6 +5,7 @@ import TradeModal from "./TradeModal";
 import styles from "./Dashboard.module.css";
 
 interface Position {
+  id: number;
   ticker: string;
   quantity: string;
   average_cost: string;
@@ -55,6 +56,8 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadSummary = useCallback(() => {
     client
@@ -66,6 +69,20 @@ export default function Dashboard() {
   useEffect(() => {
     loadSummary();
   }, [loadSummary]);
+
+  async function handleDelete(id: number, ticker: string) {
+    if (!window.confirm(`Delete holding ${ticker}? This cannot be undone.`)) return;
+    setDeletingId(id);
+    setDeleteError(null);
+    try {
+      await client.delete(`/holdings/${id}/`);
+      loadSummary();
+    } catch {
+      setDeleteError("Failed to delete holding. Please try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div className={styles.page}>
@@ -108,6 +125,7 @@ export default function Dashboard() {
             {/* Positions */}
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>Positions</h2>
+              {deleteError && <p className={styles.deleteError}>{deleteError}</p>}
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
@@ -118,11 +136,12 @@ export default function Dashboard() {
                       <th className={styles.right}>Price</th>
                       <th className={styles.right}>Market Value</th>
                       <th className={styles.right}>P&amp;L</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.positions.map((p) => (
-                      <tr key={p.ticker}>
+                      <tr key={p.id}>
                         <td className={styles.ticker}>{p.ticker}</td>
                         <td className={styles.right}>{fmt(p.quantity, 4)}</td>
                         <td className={styles.right}>${fmt(p.average_cost)}</td>
@@ -136,6 +155,15 @@ export default function Dashboard() {
                           {p.pnl
                             ? `${parseFloat(p.pnl) >= 0 ? "+" : ""}$${fmt(p.pnl)}`
                             : "—"}
+                        </td>
+                        <td className={styles.actionCell}>
+                          <button
+                            className={styles.deleteBtn}
+                            onClick={() => handleDelete(p.id, p.ticker)}
+                            disabled={deletingId === p.id}
+                          >
+                            {deletingId === p.id ? "…" : "Delete"}
+                          </button>
                         </td>
                       </tr>
                     ))}
