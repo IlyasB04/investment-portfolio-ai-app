@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import client from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import TradeModal from "./TradeModal";
 import styles from "./Dashboard.module.css";
 
 interface Position {
@@ -53,16 +54,27 @@ export default function Dashboard() {
   const { logout } = useAuth();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  useEffect(() => {
+  const loadSummary = useCallback(() => {
     client
       .get<Summary>("/portfolio/summary/")
       .then((res) => setSummary(res.data))
       .catch(() => setError("Failed to load portfolio data."));
   }, []);
 
+  useEffect(() => {
+    loadSummary();
+  }, [loadSummary]);
+
   return (
     <div className={styles.page}>
+      {modalOpen && (
+        <TradeModal
+          onClose={() => setModalOpen(false)}
+          onSuccess={loadSummary}
+        />
+      )}
       <header className={styles.topbar}>
         <span className={styles.brand}>◈ Portfolio</span>
         <button className={styles.logout} onClick={logout}>
@@ -81,10 +93,16 @@ export default function Dashboard() {
           <>
             {/* Total value */}
             <section className={styles.hero}>
-              <p className={styles.heroLabel}>Total Portfolio Value</p>
-              <p className={styles.heroValue}>
-                ${fmt(summary.total_value)}
-              </p>
+              <div>
+                <p className={styles.heroLabel}>Total Portfolio Value</p>
+                <p className={styles.heroValue}>${fmt(summary.total_value)}</p>
+              </div>
+              <button
+                className={styles.addTradeBtn}
+                onClick={() => setModalOpen(true)}
+              >
+                + Add Trade
+              </button>
             </section>
 
             {/* Positions */}

@@ -70,6 +70,27 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.addTradeBtn {
+  flex-shrink: 0;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.addTradeBtn:hover {
+  opacity: 0.88;
 }
 
 .heroLabel {
