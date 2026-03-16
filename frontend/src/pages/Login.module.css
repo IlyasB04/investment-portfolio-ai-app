@@ -12,32 +12,35 @@
   max-width: 400px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 40px 36px;
+  border-top: 2px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 44px 40px;
+  box-shadow: var(--shadow-float);
 }
 
 .header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 36px;
 }
 
 .logo {
-  font-size: 28px;
+  font-size: 30px;
   color: var(--accent);
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  line-height: 1;
 }
 
 .title {
   font-size: 22px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 6px;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.5px;
 }
 
 .subtitle {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-muted);
   margin: 0;
 }
@@ -55,53 +58,52 @@
 }
 
 .label {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-secondary);
   letter-spacing: 0.3px;
 }
 
 .input {
   background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 15px;
-  padding: 10px 13px;
+  padding: 11px 14px;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .input:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
 .error {
   font-size: 13px;
   color: var(--negative);
   margin: 0;
-  padding: 10px 13px;
-  background: color-mix(in srgb, var(--negative) 10%, transparent);
-  border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--negative) 30%, transparent);
+  padding: 10px 14px;
+  background: var(--negative-dim);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(239, 68, 68, 0.28);
 }
 
 .button {
-  margin-top: 4px;
+  margin-top: 6px;
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   font-size: 15px;
-  font-weight: 500;
-  padding: 11px;
+  font-weight: 600;
+  padding: 12px;
   cursor: pointer;
   transition: opacity 0.15s;
 }
 
-.button:hover:not(:disabled) {
-  opacity: 0.88;
-}
+.button:hover:not(:disabled) { opacity: 0.88; }
 
 .button:disabled {
   opacity: 0.5;

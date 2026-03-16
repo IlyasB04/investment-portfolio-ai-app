@@ -1,27 +1,49 @@
 /* ── Design tokens ── */
 :root {
-  --bg-base:    #0d0e14;
-  --bg-card:    #13141c;
-  --bg-input:   #0f1018;
+  /* Backgrounds */
+  --bg-base:    #0B1120;
+  --bg-card:    #111827;
+  --bg-surface: #162033;
+  --bg-input:   #0E1628;
 
-  --border:     #1e2030;
+  /* Borders */
+  --border:        rgba(99, 120, 180, 0.13);
+  --border-strong: rgba(99, 120, 180, 0.24);
 
-  --text-primary:   #f0f1f5;
-  --text-secondary: #9195a8;
-  --text-muted:     #555869;
+  /* Accent */
+  --accent:      #6C8CFF;
+  --accent-dim:  rgba(108, 140, 255, 0.14);
+  --accent-glow: rgba(108, 140, 255, 0.06);
 
-  --accent:   #6c8fff;
-  --positive: #34d399;
-  --negative: #f87171;
+  /* Status */
+  --positive:     #22C55E;
+  --positive-dim: rgba(34, 197, 94, 0.12);
+  --negative:     #EF4444;
+  --negative-dim: rgba(239, 68, 68, 0.12);
+  --warning:      #F59E0B;
+  --warning-dim:  rgba(245, 158, 11, 0.12);
 
+  /* Text */
+  --text-primary:   #EFF3FC;
+  --text-secondary: #8A9BBE;
+  --text-muted:     #445070;
+
+  /* Typography */
   --mono: ui-monospace, "SF Mono", Consolas, "Courier New", monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sans: -apple-system, "Inter", "Segoe UI", system-ui, Roboto, sans-serif;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Shadows */
+  --shadow-card:  0 2px 16px rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 8px 40px rgba(0, 0, 0, 0.6);
 }
 
 /* ── Reset ── */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body, #root {
   margin: 0;
@@ -31,15 +53,14 @@ html, body, #root {
 
 body {
   font-family: var(--sans);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.6;
   color: var(--text-secondary);
   background: var(--bg-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Remove #root layout constraints from Vite starter */
 #root {
   width: 100%;
   max-width: 100%;
@@ -48,16 +69,18 @@ body {
   display: block;
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4 {
   margin: 0;
   font-weight: 600;
   color: var(--text-primary);
+  line-height: 1.3;
 }
 
-p {
-  margin: 0;
-}
+p { margin: 0; }
 
-button, input {
-  font-family: inherit;
-}
+button, input, textarea, select { font-family: inherit; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }

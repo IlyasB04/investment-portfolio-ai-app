@@ -8,19 +8,20 @@
   display: flex;
   align-items: center;
   background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   padding: 0 12px;
   gap: 8px;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .inputWrap:focus-within {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
 .icon {
-  font-size: 16px;
+  font-size: 15px;
   color: var(--text-muted);
   flex-shrink: 0;
   line-height: 1;
@@ -30,7 +31,7 @@
   background: none;
   border: none;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   font-family: var(--sans);
   padding: 9px 0;
   outline: none;
@@ -38,14 +39,9 @@
   min-width: 0;
 }
 
-.input::placeholder {
-  color: var(--text-muted);
-}
+.input::placeholder { color: var(--text-muted); }
 
-.spinner {
-  font-size: 13px;
-  color: var(--text-muted);
-}
+.spinner { font-size: 13px; color: var(--text-muted); }
 
 /* Dropdown */
 .dropdown {
@@ -54,11 +50,11 @@
   left: 0;
   right: 0;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
   z-index: 50;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-float);
 }
 
 .result {
@@ -66,17 +62,13 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  border-bottom: 1px solid var(--border);
   gap: 12px;
+  transition: background 0.1s;
 }
 
-.result:last-child {
-  border-bottom: none;
-}
-
-.result:hover {
-  background: color-mix(in srgb, var(--border) 30%, transparent);
-}
+.result:last-child { border-bottom: none; }
+.result:hover { background: var(--accent-glow); }
 
 .resultMeta {
   display: flex;
@@ -88,7 +80,7 @@
 
 .resultTicker {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--mono);
   color: var(--text-primary);
   flex-shrink: 0;
@@ -105,7 +97,7 @@
 .resultBadge {
   font-size: 10px;
   color: var(--text-muted);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 3px;
   padding: 1px 4px;
   text-transform: uppercase;
@@ -113,34 +105,28 @@
   flex-shrink: 0;
 }
 
-.resultActions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
+.resultActions { display: flex; gap: 6px; flex-shrink: 0; }
 
 .actionBtn {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 700;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 4px;
   padding: 3px 10px;
   cursor: pointer;
   transition: opacity 0.15s;
 }
 
 .actionBtn.buy {
-  background: color-mix(in srgb, var(--positive) 15%, transparent);
-  border-color: color-mix(in srgb, var(--positive) 30%, transparent);
+  background: var(--positive-dim);
+  border-color: rgba(34, 197, 94, 0.28);
   color: var(--positive);
 }
 
 .actionBtn.sell {
-  background: color-mix(in srgb, var(--negative) 15%, transparent);
-  border-color: color-mix(in srgb, var(--negative) 30%, transparent);
+  background: var(--negative-dim);
+  border-color: rgba(239, 68, 68, 0.28);
   color: var(--negative);
 }
 
-.actionBtn:hover {
-  opacity: 0.8;
-}
+.actionBtn:hover { opacity: 0.75; }

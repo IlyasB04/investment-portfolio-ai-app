@@ -5,6 +5,8 @@ import PortfolioValueChart from "./PortfolioValueChart";
 import HistoryChart from "./HistoryChart";
 import OrderTicket from "./OrderTicket";
 import InstrumentSearch from "./InstrumentSearch";
+import ImportModal from "./ImportModal";
+import AIAssistant from "./AIAssistant";
 import styles from "./Dashboard.module.css";
 
 interface Position {
@@ -82,6 +84,7 @@ export default function Dashboard() {
     ticker: "",
     side: "BUY",
   });
+  const [importOpen, setImportOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -129,6 +132,9 @@ export default function Dashboard() {
 
   return (
     <div className={styles.page}>
+      {importOpen && (
+        <ImportModal onClose={() => setImportOpen(false)} onSuccess={handleRefresh} />
+      )}
       {orderTicket.open && summary && (
         <OrderTicket
           initialTicker={orderTicket.ticker}
@@ -140,9 +146,14 @@ export default function Dashboard() {
       )}
 
       <header className={styles.topbar}>
-        <span className={styles.brand}>◈ Portfolio</span>
+        <span className={styles.brand}>
+          <span className={styles.brandAccent}>◈</span> Portfolio
+        </span>
         <InstrumentSearch onTrade={openOrderTicket} />
         <div className={styles.topbarRight}>
+          <button className={styles.importBtn} onClick={() => setImportOpen(true)}>
+            Import CSV
+          </button>
           <button
             className={styles.tradeBtn}
             onClick={() => openOrderTicket("", "BUY")}
@@ -210,6 +221,13 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
+                    {summary.positions.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className={styles.emptyRow}>
+                          No positions yet — search for an instrument above or import a CSV to get started.
+                        </td>
+                      </tr>
+                    )}
                     {summary.positions.map((p) => (
                       <tr key={p.id}>
                         <td className={styles.ticker}>{p.ticker}</td>
@@ -299,6 +317,9 @@ export default function Dashboard() {
                 </div>
               </section>
             </div>
+
+            {/* AI Portfolio Assistant */}
+            <AIAssistant />
 
             {/* Recent Transactions */}
             {transactions.length > 0 && (

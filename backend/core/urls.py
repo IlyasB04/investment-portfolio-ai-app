@@ -6,6 +6,7 @@ from .views import health
 from .views_import import import_csv
 from .views_market import quote, search
 from .views_portfolio import portfolio_history, portfolio_summary
+from .views_ai import portfolio_chat
 from .views_trading import place_order, recent_transactions
 
 router = DefaultRouter()
@@ -26,6 +27,9 @@ urlpatterns = [
     # Paper trading
     path("orders/", place_order),
     path("orders/transactions/", recent_transactions),
+
+    # AI assistant
+    path("ai/chat/", portfolio_chat),
 
     # Holdings CRUD (router)
     path("", include(router.urls)),
