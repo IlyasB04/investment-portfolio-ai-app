@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import client from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import TradeModal from "./TradeModal";
 import PortfolioValueChart from "./PortfolioValueChart";
+import HistoryChart from "./HistoryChart";
+import OrderTicket from "./OrderTicket";
+import InstrumentSearch from "./InstrumentSearch";
 import styles from "./Dashboard.module.css";
 
 interface Position {
@@ -29,9 +31,22 @@ interface Concentration {
 
 interface Summary {
   total_value: string;
+  cash_balance: string;
+  total_with_cash: string;
   positions: Position[];
   allocation: Allocation[];
   concentration: Concentration;
+}
+
+interface Transaction {
+  id: number;
+  ticker: string;
+  side: "BUY" | "SELL";
+  quantity: string;
+  price: string;
+  total_value: string;
+  cash_after: string;
+  created_at: string;
 }
 
 function fmt(value: string | null, decimals = 2): string {
@@ -53,11 +68,20 @@ function pnlClass(value: string | null): string {
   return "";
 }
 
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 export default function Dashboard() {
   const { logout } = useAuth();
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [orderTicket, setOrderTicket] = useState<{ open: boolean; ticker: string; side: "BUY" | "SELL" }>({
+    open: false,
+    ticker: "",
+    side: "BUY",
+  });
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -68,9 +92,26 @@ export default function Dashboard() {
       .catch(() => setError("Failed to load portfolio data."));
   }, []);
 
+  const loadTransactions = useCallback(() => {
+    client
+      .get<Transaction[]>("/orders/transactions/")
+      .then((res) => setTransactions(res.data))
+      .catch(() => {/* silently fail */});
+  }, []);
+
   useEffect(() => {
     loadSummary();
-  }, [loadSummary]);
+    loadTransactions();
+  }, [loadSummary, loadTransactions]);
+
+  function handleRefresh() {
+    loadSummary();
+    loadTransactions();
+  }
+
+  function openOrderTicket(ticker: string, side: "BUY" | "SELL") {
+    setOrderTicket({ open: true, ticker, side });
+  }
 
   async function handleDelete(id: number, ticker: string) {
     if (!window.confirm(`Delete holding ${ticker}? This cannot be undone.`)) return;
@@ -88,17 +129,30 @@ export default function Dashboard() {
 
   return (
     <div className={styles.page}>
-      {modalOpen && (
-        <TradeModal
-          onClose={() => setModalOpen(false)}
-          onSuccess={loadSummary}
+      {orderTicket.open && summary && (
+        <OrderTicket
+          initialTicker={orderTicket.ticker}
+          initialSide={orderTicket.side}
+          cashBalance={summary.cash_balance}
+          onClose={() => setOrderTicket((s) => ({ ...s, open: false }))}
+          onSuccess={handleRefresh}
         />
       )}
+
       <header className={styles.topbar}>
         <span className={styles.brand}>◈ Portfolio</span>
-        <button className={styles.logout} onClick={logout}>
-          Sign out
-        </button>
+        <InstrumentSearch onTrade={openOrderTicket} />
+        <div className={styles.topbarRight}>
+          <button
+            className={styles.tradeBtn}
+            onClick={() => openOrderTicket("", "BUY")}
+          >
+            + Trade
+          </button>
+          <button className={styles.logout} onClick={logout}>
+            Sign out
+          </button>
+        </div>
       </header>
 
       <main className={styles.main}>
@@ -110,19 +164,33 @@ export default function Dashboard() {
 
         {summary && (
           <>
-            {/* Total value */}
+            {/* Hero */}
             <section className={styles.hero}>
-              <div>
-                <p className={styles.heroLabel}>Total Portfolio Value</p>
-                <p className={styles.heroValue}>${fmt(summary.total_value)}</p>
+              <div className={styles.heroLeft}>
+                <div className={styles.heroBlock}>
+                  <p className={styles.heroLabel}>Total Portfolio</p>
+                  <p className={styles.heroValue}>${fmt(summary.total_with_cash)}</p>
+                </div>
+                <div className={styles.heroDivider} />
+                <div className={styles.heroBlock}>
+                  <p className={styles.heroLabel}>Equities</p>
+                  <p className={styles.heroValueSm}>${fmt(summary.total_value)}</p>
+                </div>
+                <div className={styles.heroBlock}>
+                  <p className={styles.heroLabel}>Cash</p>
+                  <p className={styles.heroValueSm}>${fmt(summary.cash_balance)}</p>
+                </div>
               </div>
               <button
                 className={styles.addTradeBtn}
-                onClick={() => setModalOpen(true)}
+                onClick={() => openOrderTicket("", "BUY")}
               >
-                + Add Trade
+                + New Order
               </button>
             </section>
+
+            {/* Performance chart */}
+            <HistoryChart />
 
             {/* Positions */}
             <section className={styles.section}>
@@ -157,13 +225,27 @@ export default function Dashboard() {
                           {parseFloat(p.pnl) >= 0 ? "+" : ""}${fmt(p.pnl)}
                         </td>
                         <td className={styles.actionCell}>
-                          <button
-                            className={styles.deleteBtn}
-                            onClick={() => handleDelete(p.id, p.ticker)}
-                            disabled={deletingId === p.id}
-                          >
-                            {deletingId === p.id ? "…" : "Delete"}
-                          </button>
+                          <div className={styles.rowActions}>
+                            <button
+                              className={styles.buyBtn}
+                              onClick={() => openOrderTicket(p.ticker, "BUY")}
+                            >
+                              Buy
+                            </button>
+                            <button
+                              className={styles.sellBtn}
+                              onClick={() => openOrderTicket(p.ticker, "SELL")}
+                            >
+                              Sell
+                            </button>
+                            <button
+                              className={styles.deleteBtn}
+                              onClick={() => handleDelete(p.id, p.ticker)}
+                              disabled={deletingId === p.id}
+                            >
+                              {deletingId === p.id ? "…" : "Delete"}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -217,6 +299,43 @@ export default function Dashboard() {
                 </div>
               </section>
             </div>
+
+            {/* Recent Transactions */}
+            {transactions.length > 0 && (
+              <section className={styles.section}>
+                <h2 className={styles.sectionTitle}>Recent Activity</h2>
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Ticker</th>
+                        <th>Side</th>
+                        <th className={styles.right}>Qty</th>
+                        <th className={styles.right}>Price</th>
+                        <th className={styles.right}>Total</th>
+                        <th className={styles.right}>Cash After</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.map((t) => (
+                        <tr key={t.id}>
+                          <td>{fmtDate(t.created_at)}</td>
+                          <td className={styles.ticker}>{t.ticker}</td>
+                          <td className={t.side === "BUY" ? styles.positive : styles.negative}>
+                            {t.side}
+                          </td>
+                          <td className={styles.right}>{fmt(t.quantity, 4)}</td>
+                          <td className={styles.right}>${fmt(t.price)}</td>
+                          <td className={styles.right}>${fmt(t.total_value)}</td>
+                          <td className={styles.right}>${fmt(t.cash_after)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
           </>
         )}
       </main>

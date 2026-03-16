@@ -17,6 +17,30 @@
   position: sticky;
   top: 0;
   z-index: 10;
+  gap: 16px;
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.tradeBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.tradeBtn:hover {
+  opacity: 0.88;
 }
 
 .brand {
@@ -66,7 +90,7 @@
 
 /* ── Hero value ── */
 .hero {
-  padding: 32px 28px;
+  padding: 28px 28px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -74,6 +98,32 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+}
+
+.heroLeft {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.heroBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.heroDivider {
+  width: 1px;
+  height: 40px;
+  background: var(--border);
+}
+
+.heroValueSm {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--mono);
+  letter-spacing: -0.5px;
+  margin: 0;
 }
 
 .addTradeBtn {
@@ -271,6 +321,40 @@
   color: var(--text-primary);
   margin: 0;
   letter-spacing: -0.5px;
+}
+
+/* ── Row action buttons ── */
+.rowActions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.buyBtn,
+.sellBtn {
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.buyBtn {
+  background: color-mix(in srgb, var(--positive) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--positive) 30%, transparent);
+  color: var(--positive);
+}
+
+.sellBtn {
+  background: color-mix(in srgb, var(--negative) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--negative) 30%, transparent);
+  color: var(--negative);
+}
+
+.buyBtn:hover,
+.sellBtn:hover {
+  opacity: 0.75;
 }
 
 /* ── Delete ── */

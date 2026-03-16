@@ -1,10 +1,28 @@
 import hashlib
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
 
-from .models import Holding, PriceSnapshot
+from .models import Holding, PortfolioAccount, PriceSnapshot
+
+_HISTORY_DAYS = 30
+_MOVE_HALF = Decimal("0.02")   # movement range: [-2%, +2%]
+
+
+def _day_movement(user_id: int, d: date) -> Decimal:
+    """
+    Deterministic daily return for a given user and date.
+
+    SHA-256 of "{user_id}:{YYYY-MM-DD}" → first 8 hex digits → unsigned int
+    → normalised to [0, 1) → scaled to [-0.02, +0.02).
+    """
+    key = f"{user_id}:{d.isoformat()}"
+    digest = hashlib.sha256(key.encode()).hexdigest()
+    seed = int(digest[:8], 16)
+    ratio = Decimal(seed) / Decimal(0xFFFFFFFF)
+    return ratio * (_MOVE_HALF * 2) - _MOVE_HALF
 
 _SYNTHETIC_MIN = Decimal("0.85")
 _SYNTHETIC_RANGE = Decimal("0.50")  # 0.85 + 0.50 = 1.35 max
@@ -79,8 +97,13 @@ def portfolio_summary(request):
     top1 = percents[0] if percents else 0.0
     top3 = sum(percents[:3])
 
+    account, _ = PortfolioAccount.objects.get_or_create(user=request.user)
+    total_with_cash = total_value + account.cash_balance
+
     return JsonResponse({
         "total_value": str(total_value),
+        "cash_balance": str(account.cash_balance),
+        "total_with_cash": str(total_with_cash),
         "positions": positions,
         "allocation": allocation,
         "concentration": {
@@ -88,3 +111,46 @@ def portfolio_summary(request):
             "top3_percent": round(top3, 6),
         },
     })
+
+
+@api_view(["GET"])
+def portfolio_history(request):
+    """
+    Return 30 days of synthetic historical portfolio values ending today.
+
+    Strategy: compute today's real total value, then walk backwards one day at
+    a time, dividing by (1 + movement) to undo each day's deterministic return.
+    The result is reversed before returning so the array runs oldest → newest.
+    """
+    holdings = list(Holding.objects.filter(user=request.user))
+
+    tickers = {h.ticker for h in holdings}
+    latest_prices = {}
+    for ticker in tickers:
+        snapshot = PriceSnapshot.objects.filter(ticker=ticker).order_by("-as_of").first()
+        if snapshot:
+            latest_prices[ticker] = snapshot.price
+
+    current_value = sum(
+        (h.quantity * (latest_prices[h.ticker] if h.ticker in latest_prices
+                       else _synthetic_price(h.ticker, h.average_cost))
+         for h in holdings),
+        Decimal(0),
+    )
+
+    today = date.today()
+    points = []
+    value = current_value
+
+    for offset in range(_HISTORY_DAYS):
+        d = today - timedelta(days=offset)
+        points.append({
+            "date": d.isoformat(),
+            "value": float(value.quantize(Decimal("0.01"))),
+        })
+        if offset < _HISTORY_DAYS - 1:
+            movement = _day_movement(request.user.id, d)
+            value = value / (1 + movement)
+
+    points.reverse()
+    return JsonResponse(points, safe=False)
