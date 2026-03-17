@@ -1,0 +1,248 @@
+/* ── Page shell ── */
+.page {
+  padding: 28px 32px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ── Header ── */
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; }
+.pageTitle { font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.5px; margin: 0 0 4px; }
+.pageSubtitle { font-size: 13px; color: var(--text-muted); }
+
+/* ── Summary cards ── */
+.summaryRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 700px) {
+  .summaryRow { grid-template-columns: repeat(2, 1fr); }
+}
+
+.statCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.statLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.statValue {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.positive { color: var(--positive); }
+.negative { color: var(--negative); }
+
+/* ── Controls ── */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 3px;
+}
+
+.filterBtn {
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  letter-spacing: 0.4px;
+}
+
+.filterActive {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.searchInput {
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--mono);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 160px;
+  text-transform: uppercase;
+}
+
+.searchInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+  text-transform: none;
+  font-family: inherit;
+}
+
+/* ── Table wrapper ── */
+.tableWrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.th {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 12px 18px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.right { text-align: right; }
+
+.row {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+
+.row:last-child { border-bottom: none; }
+
+.row:hover { background: var(--bg-surface); }
+
+.td {
+  padding: 13px 18px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.dateCell {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ticker {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+
+.sideBadge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.buy {
+  background: var(--positive-dim);
+  color: var(--positive);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.sell {
+  background: var(--negative-dim);
+  color: var(--negative);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.totalVal {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ── States ── */
+.loadingMsg, .errorMsg {
+  padding: 32px 24px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.errorMsg { color: var(--negative); }
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 56px 24px;
+  text-align: center;
+}
+
+.emptyTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.emptySub {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: 360px;
+}
+
+/* ── Disclaimer ── */
+.disclaimer {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}

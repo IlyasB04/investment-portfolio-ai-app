@@ -1,8 +1,22 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import AppShell from "./components/AppShell";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
+import Overview from "./pages/Overview";
+import PortfolioPage from "./pages/PortfolioPage";
+import TradePage from "./pages/TradePage";
+import ImportPage from "./pages/ImportPage";
+import AssistantPage from "./pages/AssistantPage";
+import ActivityPage from "./pages/ActivityPage";
+
+function ProtectedShell() {
+  return (
+    <ProtectedRoute>
+      <AppShell />
+    </ProtectedRoute>
+  );
+}
 
 export default function App() {
   return (
@@ -10,15 +24,19 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+          <Route element={<ProtectedShell />}>
+            <Route path="/overview"   element={<Overview />} />
+            <Route path="/portfolio"  element={<PortfolioPage />} />
+            <Route path="/trade"      element={<TradePage />} />
+            <Route path="/import"     element={<ImportPage />} />
+            <Route path="/assistant"  element={<AssistantPage />} />
+            <Route path="/activity"   element={<ActivityPage />} />
+          </Route>
+
+          {/* Legacy + catch-all → overview */}
+          <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
+          <Route path="*"          element={<Navigate to="/overview" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

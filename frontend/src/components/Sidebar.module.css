@@ -1,0 +1,151 @@
+.sidebar {
+  width: var(--sidebar-w);
+  height: 100%;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 10;
+}
+
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed-w);
+}
+
+/* ── Brand ── */
+.brand {
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.brandIcon {
+  font-size: 18px;
+  color: var(--accent);
+  flex-shrink: 0;
+  line-height: 1;
+  width: 20px;
+  text-align: center;
+}
+
+.brandLabel {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+  opacity: 1;
+  transition: opacity 0.15s;
+}
+
+.collapsed .brandLabel {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Nav ── */
+.nav {
+  flex: 1;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+/* ── Item (shared by NavLink and button) ── */
+.item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+  width: 100%;
+  text-align: left;
+  /* Reset button styles */
+  background: none;
+  border: none;
+  text-decoration: none;
+}
+
+.item:hover {
+  background: var(--accent-glow);
+  color: var(--text-secondary);
+}
+
+.item.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.itemIcon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.itemLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 1;
+  transition: opacity 0.12s;
+}
+
+.collapsed .itemLabel {
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+}
+
+/* ── Footer ── */
+.footer {
+  padding: 10px 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+/* ── Collapse toggle ── */
+.collapseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 2px 0;
+  height: 28px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  width: calc(100% - 4px);
+}
+
+.collapseBtn:hover {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}
