@@ -1,28 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
+import { usePortfolio } from "../context/PortfolioContext";
 import HistoryChart from "./HistoryChart";
 import AssistantSlideOver from "../components/AssistantSlideOver";
 import styles from "./Overview.module.css";
-
-interface Position {
-  id: number;
-  ticker: string;
-  quantity: string;
-  average_cost: string;
-  price: string;
-  market_value: string;
-  pnl: string;
-  is_synthetic_price: boolean;
-}
-
-interface Summary {
-  total_value: string;
-  cash_balance: string;
-  total_with_cash: string;
-  positions: Position[];
-  concentration: { top1_percent: number; top3_percent: number };
-}
 
 interface Transaction {
   id: number;
@@ -46,16 +28,18 @@ function fmtDate(iso: string) {
 
 export default function Overview() {
   const navigate = useNavigate();
-  const [summary, setSummary] = useState<Summary | null>(null);
+  // Use global portfolio context — no local summary fetch needed
+  const { summary } = usePortfolio();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [aiOpen, setAiOpen] = useState(false);
 
-  const load = useCallback(() => {
-    client.get<Summary>("/portfolio/summary/").then((r) => setSummary(r.data)).catch(() => {});
-    client.get<Transaction[]>("/orders/transactions/?limit=5").then((r) => setTransactions(r.data)).catch(() => {});
+  const loadTransactions = useCallback(() => {
+    client.get<Transaction[]>("/orders/transactions/?limit=5")
+      .then((r) => setTransactions(r.data))
+      .catch(() => {});
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadTransactions(); }, [loadTransactions]);
 
   const topPositions = summary
     ? [...summary.positions]

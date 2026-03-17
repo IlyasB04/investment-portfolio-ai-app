@@ -1,5 +1,7 @@
 import { ChangeEvent, useRef, useState } from "react";
 import client from "../api/client";
+import { usePortfolio } from "../context/PortfolioContext";
+import { useToast } from "../context/ToastContext";
 import styles from "./ImportPage.module.css";
 
 interface PreviewRow {
@@ -53,6 +55,8 @@ MSFT,5,380.00
 NVDA,3,820.00`;
 
 export default function ImportPage() {
+  const { refresh: refreshPortfolio } = usePortfolio();
+  const { addToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewRow[] | null>(null);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
@@ -94,9 +98,13 @@ export default function ImportPage() {
       });
       setResult(res.data);
       setPreview(null);
+      await refreshPortfolio();
+      addToast(`Imported ${res.data.imported} holdings successfully`, "success");
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      setUploadError(e?.response?.data?.error ?? "Import failed. Please check your file.");
+      const msg = e?.response?.data?.error ?? "Import failed. Please check your file.";
+      setUploadError(msg);
+      addToast(msg, "error");
     } finally {
       setLoading(false);
     }

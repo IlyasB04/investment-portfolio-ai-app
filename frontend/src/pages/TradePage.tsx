@@ -1,7 +1,9 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import client from "../api/client";
+import { usePortfolio } from "../context/PortfolioContext";
+import { useToast } from "../context/ToastContext";
 import styles from "./TradePage.module.css";
 
 interface Quote {
@@ -39,6 +41,8 @@ function fmt(v: string | number | null, dec = 2) {
 export default function TradePage() {
   const location = useLocation();
   const state = location.state as { ticker?: string; side?: "BUY" | "SELL" } | null;
+  const { summary, refresh: refreshPortfolio } = usePortfolio();
+  const { addToast } = useToast();
 
   const [side, setSide] = useState<"BUY" | "SELL">(state?.side ?? "BUY");
   const [ticker, setTicker] = useState((state?.ticker ?? "").toUpperCase());
@@ -46,22 +50,18 @@ export default function TradePage() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [holding, setHolding] = useState<Holding | null>(null);
-  const [cashBalance, setCashBalance] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [executing, setExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OrderResult | null>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
 
-  // Load cash balance
-  useEffect(() => {
-    client.get<{ cash_balance: string }>("/portfolio/summary/")
-      .then((r) => setCashBalance(r.data.cash_balance))
-      .catch(() => {});
-  }, []);
+  // Cash balance comes from the global portfolio context — always up to date
+  const cashBalance = summary?.cash_balance ?? null;
 
-  // Fetch quote + current holding when ticker changes
+  // Fetch quote + current holding whenever ticker changes (debounced 380ms)
   useEffect(() => {
     if (ticker.length < 1) { setQuote(null); setHolding(null); return; }
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       setQuoteLoading(true);
       try {
         const [quoteRes, holdingsRes] = await Promise.all([
@@ -77,39 +77,57 @@ export default function TradePage() {
       } finally {
         setQuoteLoading(false);
       }
-    }, 400);
-    return () => clearTimeout(t);
+    }, 380);
+    return () => clearTimeout(timer);
   }, [ticker]);
 
   const execPrice = quote?.price ? parseFloat(quote.price) : null;
   const qty = parseFloat(quantity);
   const estimatedValue = execPrice && qty > 0 ? execPrice * qty : null;
+  const cashNum = cashBalance ? parseFloat(cashBalance) : null;
+  const willExceedCash = side === "BUY" && estimatedValue !== null && cashNum !== null && estimatedValue > cashNum;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setResult(null);
+
     if (!ticker) { setError("Enter a ticker symbol."); return; }
     if (!(qty > 0)) { setError("Quantity must be greater than zero."); return; }
 
-    setLoading(true);
+    setExecuting(true);
     try {
       const res = await client.post<OrderResult>("/orders/", { side, ticker, quantity: qty });
       setResult(res.data);
-      setCashBalance(res.data.cash_balance);
       setQuantity("");
-      // Refresh holding
+
+      // Refresh global portfolio — updates cash, Overview metrics, PortfolioPage
+      await refreshPortfolio();
+
+      // Refresh local holding display
       const holdingsRes = await client.get<Holding[]>("/holdings/");
       const found = holdingsRes.data.find((h) => h.ticker.toUpperCase() === ticker);
       setHolding(found ?? null);
+
+      // Success toast
+      const filled = res.data;
+      addToast(
+        `${filled.side} ${fmt(filled.quantity, 4)} ${filled.ticker} @ $${fmt(filled.executed_price)} · Total $${fmt(filled.total_value)}`,
+        "success",
+        5000,
+      );
+
+      setTimeout(() => quantityRef.current?.focus(), 80);
+
     } catch (err) {
+      let msg = "Order failed. Please try again.";
       if (axios.isAxiosError(err) && err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else {
-        setError("Order failed. Please try again.");
+        msg = err.response.data.error;
       }
+      setError(msg);
+      addToast(msg, "error");
     } finally {
-      setLoading(false);
+      setExecuting(false);
     }
   }
 
@@ -133,12 +151,22 @@ export default function TradePage() {
                 type="text"
                 placeholder="e.g. AAPL"
                 value={ticker}
-                onChange={(e) => { setTicker(e.target.value.toUpperCase()); setResult(null); setError(null); }}
+                onChange={(e) => {
+                  setTicker(e.target.value.toUpperCase());
+                  setResult(null);
+                  setError(null);
+                }}
                 autoFocus
               />
             </div>
 
-            {quoteLoading && <p className={styles.quoteLoading}>Fetching quote…</p>}
+            {quoteLoading && (
+              <div className={styles.quoteSkeleton}>
+                <div className={styles.skeletonLine} />
+                <div className={styles.skeletonPrice} />
+                <div className={styles.skeletonLine} style={{ width: "45%" }} />
+              </div>
+            )}
 
             {!quoteLoading && quote && (
               <div className={styles.quoteData}>
@@ -156,7 +184,9 @@ export default function TradePage() {
                     )}
                   </>
                 ) : (
-                  <p className={styles.quoteUnavailable}>Price unavailable — will estimate at execution</p>
+                  <p className={styles.quoteUnavailable}>
+                    Price unavailable — execution price set at order time
+                  </p>
                 )}
               </div>
             )}
@@ -177,10 +207,19 @@ export default function TradePage() {
                   <span>Avg cost</span>
                   <span className={styles.holdingVal}>${fmt(holding.average_cost)}</span>
                 </div>
+                {execPrice !== null && (
+                  <div className={styles.holdingRow}>
+                    <span>Unrealised P&amp;L</span>
+                    <span className={`${styles.holdingVal} ${(execPrice - parseFloat(holding.average_cost)) >= 0 ? styles.posVal : styles.negVal}`}>
+                      {(execPrice - parseFloat(holding.average_cost)) >= 0 ? "+" : ""}$
+                      {fmt((execPrice - parseFloat(holding.average_cost)) * parseFloat(holding.quantity))}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Cash balance */}
+            {/* Cash balance from global store */}
             {cashBalance && (
               <div className={styles.cashCard}>
                 <p className={styles.holdingLabel}>Available cash</p>
@@ -200,7 +239,9 @@ export default function TradePage() {
                 <div>
                   <p className={styles.successTitle}>Order filled</p>
                   <p className={styles.successDetail}>
-                    {result.side} {fmt(result.quantity, 4)} {result.ticker} @ ${fmt(result.executed_price)} · Total ${fmt(result.total_value)}
+                    {result.side} {fmt(result.quantity, 4)} {result.ticker} @ ${fmt(result.executed_price)}
+                    {" · "}Total ${fmt(result.total_value)}
+                    {result.price_source !== "live" && ` · ${result.price_source} price`}
                   </p>
                 </div>
               </div>
@@ -228,6 +269,7 @@ export default function TradePage() {
               <div className={styles.field}>
                 <label className={styles.fieldLabel}>Quantity</label>
                 <input
+                  ref={quantityRef}
                   className={styles.input}
                   type="number"
                   placeholder="0"
@@ -247,12 +289,16 @@ export default function TradePage() {
                 </div>
                 <div className={styles.summaryRow}>
                   <span>Estimated value</span>
-                  <span>{estimatedValue ? `$${fmt(estimatedValue)}` : "—"}</span>
+                  <span className={estimatedValue ? styles.summaryHighlight : ""}>
+                    {estimatedValue ? `$${fmt(estimatedValue)}` : "—"}
+                  </span>
                 </div>
                 {side === "BUY" && cashBalance && (
                   <div className={styles.summaryRow}>
                     <span>Cash available</span>
-                    <span>${fmt(cashBalance)}</span>
+                    <span className={willExceedCash ? styles.summaryWarn : ""}>
+                      ${fmt(cashBalance)}
+                    </span>
                   </div>
                 )}
                 {side === "SELL" && holding && (
@@ -268,17 +314,17 @@ export default function TradePage() {
               <button
                 type="submit"
                 className={`${styles.submitBtn} ${side === "SELL" ? styles.submitSell : ""}`}
-                disabled={loading || !ticker}
+                disabled={executing || !ticker}
               >
-                {loading ? "Placing order…" : `Place ${side} Order`}
+                {executing ? "Placing order…" : `Place ${side} Order`}
               </button>
             </form>
           </div>
 
-          {/* Disclaimer */}
           <p className={styles.disclaimer}>
             This is a paper trading simulator. No real money or brokerage accounts are involved.
-            Prices are sourced from Yahoo Finance where available.
+            Prices are sourced from Yahoo Finance where available, with deterministic synthetic
+            pricing as fallback — trades always execute.
           </p>
         </div>
       </div>

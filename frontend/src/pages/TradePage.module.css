@@ -319,6 +319,49 @@
 .submitBtn:hover:not(:disabled) { opacity: 0.88; }
 .submitBtn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* ── Skeleton loader ── */
+.quoteSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.skeletonLine {
+  height: 14px;
+  width: 70%;
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--border) 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 4px;
+}
+
+.skeletonPrice {
+  height: 36px;
+  width: 55%;
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--border) 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── P&L colouring in holding card ── */
+.posVal { color: var(--positive) !important; }
+.negVal { color: var(--negative) !important; }
+
+/* ── Summary row highlights ── */
+.summaryHighlight { color: var(--accent); }
+.summaryWarn { color: var(--negative); }
+
 /* ── Disclaimer ── */
 .disclaimer {
   font-size: 11px;

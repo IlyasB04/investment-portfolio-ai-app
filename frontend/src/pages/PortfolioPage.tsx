@@ -1,34 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
+import { usePortfolio } from "../context/PortfolioContext";
+import { useToast } from "../context/ToastContext";
 import PortfolioValueChart from "./PortfolioValueChart";
 import styles from "./PortfolioPage.module.css";
-
-interface Position {
-  id: number;
-  ticker: string;
-  quantity: string;
-  average_cost: string;
-  price: string;
-  market_value: string;
-  pnl: string;
-  is_synthetic_price: boolean;
-}
-
-interface Allocation {
-  ticker: string;
-  market_value: string;
-  percent_of_portfolio: string;
-}
-
-interface Summary {
-  total_value: string;
-  cash_balance: string;
-  total_with_cash: string;
-  positions: Position[];
-  allocation: Allocation[];
-  concentration: { top1_percent: number; top3_percent: number };
-}
 
 function fmt(v: string | null, dec = 2) {
   if (v === null) return "—";
@@ -43,23 +19,12 @@ function fmtPct(v: number | string) {
 
 export default function PortfolioPage() {
   const navigate = useNavigate();
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { summary, loading, refresh } = usePortfolio();
+  const { addToast } = useToast();
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<"market_value" | "pnl" | "ticker">("market_value");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
-
-  const load = useCallback(() => {
-    setLoading(true);
-    client
-      .get<Summary>("/portfolio/summary/")
-      .then((r) => setSummary(r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
 
   function toggleSort(col: typeof sortBy) {
     if (sortBy === col) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
@@ -82,9 +47,12 @@ export default function PortfolioPage() {
     setDeleteError(null);
     try {
       await client.delete(`/holdings/${id}/`);
-      load();
+      await refresh();
+      addToast(`${ticker} removed from portfolio`, "info");
     } catch {
-      setDeleteError("Failed to remove holding. Please try again.");
+      const msg = "Failed to remove holding. Please try again.";
+      setDeleteError(msg);
+      addToast(msg, "error");
     } finally {
       setDeletingId(null);
     }
