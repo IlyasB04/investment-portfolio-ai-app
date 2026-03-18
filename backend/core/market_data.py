@@ -168,13 +168,23 @@ def get_execution_price(
     Return (price, source) for trade execution. NEVER raises.
 
     Resolution order:
+      0. GBM simulator  (in-memory, always current — "simulated_live")
       1. Yahoo Finance live quote
-      2. Latest PriceSnapshot from DB
-      3. Synthetic price (from average_cost if available, else from ticker hash)
+      2. Latest PriceSnapshot in DB
+      3. Deterministic synthetic price
     """
     ticker = ticker.upper()
 
-    # 1. Live quote
+    # 0. GBM simulator — fastest path, no I/O
+    try:
+        from .simulator import ensure_tracked
+        sim_price = ensure_tracked(ticker)   # initialises if first seen
+        if sim_price and sim_price > 0:
+            return Decimal(str(round(sim_price, 4))), "simulated_live"
+    except Exception as exc:
+        logger.debug("Simulator price unavailable for %s: %s", ticker, exc)
+
+    # 1. Yahoo Finance live quote
     try:
         quote = _yahoo_quote(ticker)
         if quote and quote["price"] > 0:

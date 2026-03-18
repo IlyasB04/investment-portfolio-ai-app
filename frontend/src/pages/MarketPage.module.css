@@ -1,0 +1,331 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Market Page — Instrument Discovery
+   ═══════════════════════════════════════════════════════════════════ */
+
+.page {
+  padding: var(--content-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  max-width: var(--page-max-w);
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ── Header ── */
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.pageSubtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.refreshBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card-2);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background var(--dur-base), border-color var(--dur-base), color var(--dur-base);
+  flex-shrink: 0;
+}
+
+.refreshBtn:hover:not(:disabled) {
+  background: var(--bg-surface);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.refreshBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Search ── */
+
+.searchBar {
+  position: relative;
+  max-width: 500px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  display: flex;
+}
+
+.searchInput {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  padding: 12px 40px 12px 40px;
+  outline: none;
+  transition: border-color var(--dur-base), box-shadow var(--dur-base);
+}
+
+.searchInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.searchInput::placeholder {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.searchSpinner {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-mid);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* ── Search results ── */
+
+.searchResults {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--sp-4);
+  max-width: 440px;
+}
+
+.noResult {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  padding: var(--sp-4);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.noResult strong {
+  color: var(--text-secondary);
+}
+
+/* ── Section ── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.sectionTitle {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--sp-4);
+}
+
+/* ── Quote card ── */
+
+.quoteCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  transition:
+    border-color var(--dur-base),
+    box-shadow var(--dur-base),
+    transform var(--dur-fast) var(--spring);
+  cursor: default;
+}
+
+.quoteCard:hover {
+  border-color: var(--border-mid);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-2px);
+}
+
+.quoteCardTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+.tickerAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.quoteCardMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.quoteCardTicker {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.03em;
+}
+
+.quoteCardName {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quoteCardPrice {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+.quoteCardChange {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pos { color: var(--positive); }
+.neg { color: var(--negative); }
+
+.sourceTag {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--warning);
+  background: var(--warning-dim);
+  border: 1px solid rgba(245,166,35,0.22);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  width: fit-content;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.quoteCardActions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+.buyBtn, .sellBtn {
+  flex: 1;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: opacity var(--dur-base), transform var(--dur-fast) var(--spring);
+  letter-spacing: 0.04em;
+}
+
+.buyBtn {
+  background: var(--positive-dim);
+  border: 1px solid rgba(34, 212, 106, 0.28);
+  color: var(--positive);
+}
+
+.buyBtn:hover {
+  opacity: 0.8;
+  transform: translateY(-1px);
+}
+
+.sellBtn {
+  background: var(--negative-dim);
+  border: 1px solid rgba(255, 77, 79, 0.28);
+  color: var(--negative);
+}
+
+.sellBtn:hover {
+  opacity: 0.8;
+  transform: translateY(-1px);
+}
+
+/* ── Skeleton ── */
+
+.skeletonAvatar {
+  background: var(--bg-surface) !important;
+  border-color: var(--border) !important;
+  animation: shimmer 1.4s infinite linear;
+}
+
+.skeletonLine {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-surface) 50%, var(--bg-card) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+.skeletonTicker  { height: 14px; width: 55%; margin-bottom: 2px; }
+.skeletonName    { height: 10px; width: 80%; }
+.skeletonPrice   { height: 26px; width: 60%; }
+.skeletonChange  { height: 12px; width: 35%; }
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}

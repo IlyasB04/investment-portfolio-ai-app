@@ -1,19 +1,21 @@
 /**
  * PortfolioContext — global portfolio state store.
  *
- * Provides the current portfolio summary to every page without each
- * page independently fetching it.  After a trade or import, call
- * `refresh()` to pull fresh data and update all consumers.
+ * Provides portfolio summary and live market prices to every page.
+ * Polls both endpoints every 3 seconds while authenticated.
+ * Silent background refreshes never trigger the loading spinner.
  */
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
-  ReactNode,
+  type ReactNode,
 } from "react";
 import client from "../api/client";
+import { useAuth } from "./AuthContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -48,10 +50,20 @@ export interface PortfolioSummary {
 
 interface PortfolioContextValue {
   summary: PortfolioSummary | null;
+  /** Live simulated prices keyed by ticker symbol. Updates every 3 s. */
+  marketPrices: Record<string, number>;
   loading: boolean;
   lastUpdated: Date | null;
-  refresh: () => Promise<void>;
+  /**
+   * Fetch the portfolio summary.
+   * Pass `silent = true` to suppress the loading spinner (used by the poller).
+   */
+  refresh: (silent?: boolean) => Promise<void>;
 }
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const POLL_MS = 3_000;
 
 // ── Context ────────────────────────────────────────────────────────────────────
 
@@ -60,31 +72,78 @@ const PortfolioContext = createContext<PortfolioContextValue | null>(null);
 // ── Provider ───────────────────────────────────────────────────────────────────
 
 export function PortfolioProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
+
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
+  const [marketPrices, setMarketPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  // Guard against setting state after the component has unmounted.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // ── Portfolio summary ───────────────────────────────────────────────────────
+
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await client.get<PortfolioSummary>("/portfolio/summary/");
-      setSummary(res.data);
-      setLastUpdated(new Date());
+      if (mountedRef.current) {
+        setSummary(res.data);
+        setLastUpdated(new Date());
+      }
     } catch {
-      // Keep existing data on error — don't wipe the UI
+      // Keep existing data on error — don't wipe the UI.
     } finally {
-      setLoading(false);
+      if (!silent && mountedRef.current) setLoading(false);
     }
   }, []);
 
-  // Initial load — only when the user is authenticated (client has token)
+  // ── Market prices ───────────────────────────────────────────────────────────
+
+  const fetchMarketPrices = useCallback(async () => {
+    try {
+      const res = await client.get<Record<string, number>>("/market/prices/");
+      if (mountedRef.current) setMarketPrices(res.data);
+    } catch {
+      // Silently ignore — simulator may not have started yet.
+    }
+  }, []);
+
+  // ── Initial load on authentication ─────────────────────────────────────────
+
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) refresh();
-  }, [refresh]);
+    if (isAuthenticated) {
+      void refresh();
+      void fetchMarketPrices();
+    } else {
+      setSummary(null);
+      setMarketPrices({});
+    }
+  }, [isAuthenticated, refresh, fetchMarketPrices]);
+
+  // ── Live polling ────────────────────────────────────────────────────────────
+  // Runs only while authenticated; cleans up automatically on logout or unmount.
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const id = setInterval(() => {
+      void refresh(true);       // silent — no loading spinner
+      void fetchMarketPrices();
+    }, POLL_MS);
+
+    return () => clearInterval(id);
+  }, [isAuthenticated, refresh, fetchMarketPrices]);
 
   return (
-    <PortfolioContext.Provider value={{ summary, loading, lastUpdated, refresh }}>
+    <PortfolioContext.Provider
+      value={{ summary, marketPrices, loading, lastUpdated, refresh }}
+    >
       {children}
     </PortfolioContext.Provider>
   );

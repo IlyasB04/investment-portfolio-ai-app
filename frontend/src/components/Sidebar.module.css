@@ -1,28 +1,35 @@
+/* ── Sidebar shell ────────────────────────────────────────────────────────── */
+
 .sidebar {
   width: var(--sidebar-w);
   height: 100%;
-  background: var(--bg-card);
-  border-right: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--border-mid);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   overflow: hidden;
-  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width var(--dur-slow) var(--ease-io);
   position: relative;
-  z-index: 10;
+  z-index: 40;
+  /* Subtle left accent glow */
+  box-shadow: inset -1px 0 0 var(--border), 2px 0 24px rgba(0,0,0,0.25);
 }
 
 .sidebar.collapsed {
   width: var(--sidebar-collapsed-w);
 }
 
-/* ── Brand ── */
+/* ── Brand header ────────────────────────────────────────────────────────── */
+
 .brand {
   height: var(--topbar-h);
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 18px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   overflow: hidden;
@@ -30,21 +37,22 @@
 }
 
 .brandIcon {
-  font-size: 18px;
-  color: var(--accent);
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
-  line-height: 1;
-  width: 20px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .brandLabel {
   font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.3px;
+  letter-spacing: -0.4px;
   opacity: 1;
-  transition: opacity 0.15s;
+  transition: opacity var(--dur-base) var(--ease-io);
+  white-space: nowrap;
 }
 
 .collapsed .brandLabel {
@@ -52,47 +60,88 @@
   pointer-events: none;
 }
 
-/* ── Nav ── */
+/* ── Nav section ─────────────────────────────────────────────────────────── */
+
 .nav {
   flex: 1;
-  padding: 10px 8px;
+  padding: 14px 8px 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   overflow: hidden;
 }
 
-/* ── Item (shared by NavLink and button) ── */
+.navGroup {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 0 10px;
+  margin-bottom: 4px;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity var(--dur-base);
+  height: 16px;
+}
+
+.collapsed .navGroup {
+  opacity: 0;
+}
+
+/* ── Nav item (shared by NavLink and button) ─────────────────────────────── */
+
 .item {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   padding: 9px 10px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: var(--text-base);
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background var(--dur-base) var(--ease-io),
+    color var(--dur-base) var(--ease-io),
+    box-shadow var(--dur-base);
   white-space: nowrap;
   overflow: hidden;
   width: 100%;
   text-align: left;
-  /* Reset button styles */
   background: none;
   border: none;
   text-decoration: none;
+  position: relative;
 }
 
 .item:hover {
-  background: var(--accent-glow);
+  background: rgba(79, 142, 255, 0.07);
   color: var(--text-secondary);
 }
 
 .item.active {
   background: var(--accent-dim);
-  color: var(--accent);
+  color: var(--accent-bright);
+  box-shadow: inset 0 0 0 1px rgba(79,142,255,0.18);
 }
+
+/* Active left indicator bar */
+.item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 25%;
+  height: 50%;
+  width: 3px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  background: var(--accent);
+  box-shadow: var(--glow-accent);
+}
+
+/* ── Item parts ──────────────────────────────────────────────────────────── */
 
 .itemIcon {
   width: 20px;
@@ -102,6 +151,12 @@
   justify-content: center;
   flex-shrink: 0;
   color: inherit;
+  transition: transform var(--dur-base) var(--spring);
+}
+
+.item:hover .itemIcon,
+.item.active .itemIcon {
+  transform: scale(1.05);
 }
 
 .itemLabel {
@@ -109,7 +164,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   opacity: 1;
-  transition: opacity 0.12s;
+  transition: opacity var(--dur-base) var(--ease-io);
+  font-size: var(--text-base);
 }
 
 .collapsed .itemLabel {
@@ -118,9 +174,41 @@
   width: 0;
 }
 
-/* ── Footer ── */
+/* ── AI badge ─────────────────────────────────────────────────────────────── */
+
+.badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid rgba(79,142,255,0.25);
+  padding: 1px 5px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+  opacity: 1;
+  transition: opacity var(--dur-base);
+}
+
+.collapsed .badge {
+  opacity: 0;
+}
+
+/* ── Logout item override ────────────────────────────────────────────────── */
+
+.logoutItem {
+  color: var(--text-muted);
+}
+
+.logoutItem:hover {
+  background: rgba(255, 77, 79, 0.08);
+  color: var(--negative);
+}
+
+/* ── Footer area ─────────────────────────────────────────────────────────── */
+
 .footer {
-  padding: 10px 8px;
+  padding: 8px 8px 12px;
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -128,19 +216,23 @@
   overflow: hidden;
 }
 
-/* ── Collapse toggle ── */
+/* ── Collapse toggle button ──────────────────────────────────────────────── */
+
 .collapseBtn {
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 4px 2px 0;
-  height: 28px;
+  height: 30px;
   background: none;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--text-muted);
   cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition:
+    background var(--dur-base),
+    color var(--dur-base),
+    border-color var(--dur-base);
   width: calc(100% - 4px);
 }
 
@@ -148,4 +240,15 @@
   background: var(--bg-surface);
   color: var(--text-secondary);
   border-color: var(--border-strong);
+}
+
+.chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--dur-slow) var(--ease-io);
+}
+
+.chevronFlipped {
+  transform: rotate(180deg);
 }

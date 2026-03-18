@@ -1,13 +1,14 @@
 """
-AI Portfolio Assistant.
+AI Portfolio Assistant views.
 
-Assembles structured portfolio context from the user's live data, then calls
-the Claude API to answer user questions in a grounded, portfolio-aware way.
-
-The assistant is deliberately scoped to portfolio analytics — it will not give
-general financial advice or promise returns.
+Endpoints
+---------
+  GET  /api/ai/health/           — service health + RAG index status
+  POST /api/ai/chat/             — basic portfolio chat (legacy, kept for backward compat)
+  POST /api/ai/financial-chat/  — advanced RAG-enabled financial assistant
 """
 
+import logging
 import os
 from decimal import Decimal
 
@@ -18,20 +19,21 @@ from .market_data import get_quote
 from .models import Holding, PortfolioAccount, Transaction
 from .views_portfolio import _synthetic_price
 
+logger = logging.getLogger(__name__)
 
-# ── Portfolio context assembly ─────────────────────────────────────────────────
+
+# ── Legacy portfolio context builder (used by /ai/chat/) ──────────────────────
 
 def _build_context(user) -> str:
     """
     Return a structured text block describing the user's current portfolio.
-    This is injected into the Claude system prompt as factual grounding.
+    Kept for the legacy /ai/chat/ endpoint.
     """
     holdings = list(Holding.objects.filter(user=user).order_by("ticker"))
     account, _ = PortfolioAccount.objects.get_or_create(user=user)
 
     lines = []
 
-    # ── Holdings ──
     if not holdings:
         lines.append("HOLDINGS: None (empty portfolio)")
     else:
@@ -79,7 +81,6 @@ def _build_context(user) -> str:
                 f"P&L {pnl_sign}${row['pnl']:.2f} ({pnl_sign}{row['pnl_pct']:.2f}%)"
             )
 
-        # ── Allocation ──
         lines.append("")
         lines.append("ALLOCATION (% of equity):")
         if total_value > 0:
@@ -87,7 +88,6 @@ def _build_context(user) -> str:
                 pct = row["market_value"] / float(total_value) * 100
                 lines.append(f"  {row['ticker']}: {pct:.2f}%")
 
-            # Concentration
             sorted_pcts = sorted(
                 [row["market_value"] / float(total_value) * 100 for row in position_rows],
                 reverse=True,
@@ -97,7 +97,6 @@ def _build_context(user) -> str:
             lines.append(f"  → Top 1 holding: {top1:.2f}% of equities")
             lines.append(f"  → Top 3 holdings: {top3:.2f}% of equities")
 
-    # ── Cash ──
     lines.append("")
     lines.append(f"CASH BALANCE: ${float(account.cash_balance):.2f}")
 
@@ -109,7 +108,6 @@ def _build_context(user) -> str:
     )
     lines.append(f"TOTAL PORTFOLIO VALUE (equities + cash): ${float(total_with_cash):.2f}")
 
-    # ── Recent transactions (last 10) ──
     txns = Transaction.objects.filter(user=user).order_by("-created_at")[:10]
     if txns:
         lines.append("")
@@ -144,16 +142,13 @@ PORTFOLIO DATA (as of this request):
 """
 
 
-# ── Claude call ────────────────────────────────────────────────────────────────
-
-def _call_claude(question: str, context: str) -> str:
+def _call_claude_legacy(question: str, context: str) -> str:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         return (
             "The AI assistant is not configured. "
             "Set ANTHROPIC_API_KEY in the backend .env file to enable it."
         )
-
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
@@ -168,14 +163,46 @@ def _call_claude(question: str, context: str) -> str:
         return f"AI assistant error: {exc}"
 
 
-# ── View ───────────────────────────────────────────────────────────────────────
+# ── Health endpoint ────────────────────────────────────────────────────────────
+
+@api_view(["GET"])
+def ai_health(request):
+    """
+    GET /api/ai/health/
+
+    Returns:
+      {
+        "status":          "ok" | "unconfigured",
+        "rag_index_ready": bool,
+        "message":         str  (only when unconfigured)
+      }
+    """
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+
+    rag_ready = False
+    try:
+        from .services.vector_store import get_vector_store
+        rag_ready = get_vector_store().is_ready()
+    except Exception:
+        pass
+
+    if not api_key:
+        return JsonResponse({
+            "status": "unconfigured",
+            "message": "ANTHROPIC_API_KEY not set",
+            "rag_index_ready": rag_ready,
+        })
+    return JsonResponse({"status": "ok", "rag_index_ready": rag_ready})
+
+
+# ── Legacy chat endpoint ───────────────────────────────────────────────────────
 
 @api_view(["POST"])
 def portfolio_chat(request):
     """
-    POST /api/ai/chat/
+    POST /api/ai/chat/   (legacy — no RAG, no memory)
 
-    Body: { "message": "What is my largest holding?" }
+    Body:    { "message": "..." }
     Returns: { "response": "...", "context_summary": "..." }
     """
     message = request.data.get("message", "").strip()
@@ -185,10 +212,76 @@ def portfolio_chat(request):
         return JsonResponse({"error": "message too long (max 2000 chars)."}, status=400)
 
     context = _build_context(request.user)
-    response = _call_claude(message, context)
+    response = _call_claude_legacy(message, context)
 
-    # Return a brief context summary so the frontend can show what data was used
     holdings_count = Holding.objects.filter(user=request.user).count()
-    context_summary = f"Based on {holdings_count} position{'s' if holdings_count != 1 else ''} and recent transactions"
-
+    context_summary = (
+        f"Based on {holdings_count} position{'s' if holdings_count != 1 else ''} "
+        "and recent transactions"
+    )
     return JsonResponse({"response": response, "context_summary": context_summary})
+
+
+# ── Advanced RAG endpoint ──────────────────────────────────────────────────────
+
+@api_view(["POST"])
+def financial_chat(request):
+    """
+    POST /api/ai/financial-chat/
+
+    Full RAG pipeline:
+      • Rich portfolio analytics context (HHI, sector exposure, volatility proxies)
+      • FAISS knowledge retrieval (top-4 chunks above confidence threshold)
+      • Per-user conversation memory (last 5 turns)
+      • Claude claude-sonnet-4-6 generation with structured system prompt
+
+    Request body
+    ------------
+    {
+      "message":    str,          required
+      "session_id": int | null    optional — omit to start a new session
+    }
+
+    Response (200)
+    --------------
+    {
+      "answer":          str,
+      "sources":         [{"source": str, "score": float, "chunk_id": int}],
+      "session_id":      int,
+      "retrieval_used":  bool,
+      "context_tokens":  int
+    }
+
+    Error (400)
+    -----------
+    { "error": "..." }
+    """
+    message = request.data.get("message", "").strip()
+    if not message:
+        return JsonResponse({"error": "message is required."}, status=400)
+    if len(message) > 2000:
+        return JsonResponse({"error": "message too long (max 2000 chars)."}, status=400)
+
+    session_id_raw = request.data.get("session_id")
+    session_id: int | None = None
+    if session_id_raw is not None:
+        try:
+            session_id = int(session_id_raw)
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "session_id must be an integer."}, status=400)
+
+    logger.info(
+        "[financial_chat] user=%s session_id=%s question_len=%d",
+        request.user.id, session_id, len(message),
+    )
+
+    try:
+        from .services.rag import generate_financial_response
+        result = generate_financial_response(request.user, message, session_id)
+        return JsonResponse(result)
+    except Exception as exc:
+        logger.exception("[financial_chat] Unhandled error: %s", exc)
+        return JsonResponse(
+            {"error": f"Assistant error: {exc}"},
+            status=500,
+        )

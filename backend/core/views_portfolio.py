@@ -5,7 +5,8 @@ portfolio_summary — full snapshot of positions with current pricing.
 portfolio_history — 30-day synthetic history built from current value.
 
 Price resolution per position:
-  1. Yahoo Finance live quote  (parallel fetch per ticker)
+  0. GBM simulator  (in-memory, always current — fastest path, no I/O)
+  1. Yahoo Finance live quote  (parallel fetch per ticker — fallback only)
   2. Latest PriceSnapshot in DB
   3. Deterministic synthetic price (always succeeds)
 """
@@ -56,7 +57,25 @@ def _synthetic_price(ticker: str, average_cost: Decimal) -> Decimal:
 
 
 def _resolve_price(ticker: str, average_cost: Decimal) -> tuple[Decimal, bool]:
-    """Return (price, is_synthetic). Tries live → snapshot → synthetic."""
+    """
+    Return (price, is_synthetic).
+
+    Resolution order:
+      0. GBM simulator  (in-memory, no I/O, always current)
+      1. Yahoo Finance live quote
+      2. Latest PriceSnapshot in DB
+      3. Deterministic synthetic fallback
+    """
+    # 0. GBM simulator — O(1), no network or DB call
+    try:
+        from .simulator import ensure_tracked
+        sim_price = ensure_tracked(ticker)
+        if sim_price and sim_price > 0:
+            return Decimal(str(round(sim_price, 4))).quantize(Decimal("0.0001")), False
+    except Exception as exc:
+        logger.debug("Simulator price unavailable for %s: %s", ticker, exc)
+
+    # 1. Yahoo Finance live (fallback — slower, requires network)
     try:
         live = get_quote(ticker)
         if live and live.get("price") and live["price"] > 0:
@@ -64,6 +83,7 @@ def _resolve_price(ticker: str, average_cost: Decimal) -> tuple[Decimal, bool]:
     except Exception as exc:
         logger.debug("Live quote failed for %s: %s", ticker, exc)
 
+    # 2. Latest PriceSnapshot from DB
     try:
         snap = PriceSnapshot.objects.filter(ticker=ticker).order_by("-as_of").first()
         if snap and snap.price > 0:
@@ -71,6 +91,7 @@ def _resolve_price(ticker: str, average_cost: Decimal) -> tuple[Decimal, bool]:
     except Exception as exc:
         logger.debug("Snapshot lookup failed for %s: %s", ticker, exc)
 
+    # 3. Deterministic synthetic — always succeeds
     return _synthetic_price(ticker, average_cost), True
 
 

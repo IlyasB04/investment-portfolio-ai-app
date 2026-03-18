@@ -9,3 +9,15 @@ PyJWT==2.11.0
 python-dotenv==1.2.2
 sqlparse==0.5.5
 typing_extensions==4.15.0
+
+# ── RAG / Vector search ───────────────────────────────────────────────────────
+# faiss-cpu:             FAISS vector index (CPU build, no GPU required)
+# sentence-transformers: Neural embeddings via all-MiniLM-L6-v2 (384-dim)
+# numpy:                 Array operations for embedding normalisation
+#
+# NOTE: sentence-transformers pulls in PyTorch (~1.5 GB on first install).
+#       Run once: pip install faiss-cpu sentence-transformers numpy
+#       Then run: python manage.py ingest_knowledge
+faiss-cpu>=1.7.4
+sentence-transformers>=2.7.0
+numpy>=1.24.0

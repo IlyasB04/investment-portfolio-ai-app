@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { type FormEvent, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import styles from "./Login.module.css";
@@ -17,10 +17,19 @@ export default function Login() {
     try {
       await login(username, password);
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 401) {
-        setError("Incorrect username or password.");
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
+        console.error("[Login] API error", status, err.response?.data);
+        if (status === 401) {
+          setError("Incorrect username or password.");
+        } else if (!err.response) {
+          setError("Cannot reach server. Make sure the backend is running.");
+        } else {
+          setError(`Sign-in failed (${status ?? "unknown"}). Please try again.`);
+        }
       } else {
-        setError("Unable to sign in. Please try again.");
+        console.error("[Login] unexpected error", err);
+        setError("An unexpected error occurred. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -31,9 +40,16 @@ export default function Login() {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.header}>
-          <span className={styles.logo}>◈</span>
-          <h1 className={styles.title}>Portfolio</h1>
-          <p className={styles.subtitle}>Sign in to your account</p>
+          <div className={styles.logo}>
+            <svg viewBox="0 0 40 40" fill="none" width="48" height="48">
+              <rect x="1" y="1" width="38" height="38" rx="10" fill="rgba(79,142,255,0.12)"/>
+              <rect x="1" y="1" width="38" height="38" rx="10" stroke="rgba(79,142,255,0.35)" strokeWidth="1.5"/>
+              <path d="M9 29L15 16L20 23L25 10L31 29" stroke="#4F8EFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="31" cy="10" r="3" fill="#22D46A" opacity="0.9"/>
+            </svg>
+          </div>
+          <h1 className={styles.title}>PortfolioAI</h1>
+          <p className={styles.subtitle}>Sign in to your investment account</p>
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>

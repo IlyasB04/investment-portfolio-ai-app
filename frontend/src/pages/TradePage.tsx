@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import client from "../api/client";
@@ -38,6 +38,34 @@ function fmt(v: string | number | null, dec = 2) {
   return isNaN(n) ? "—" : n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 
+/** Extract the most useful error message from any Axios error response. */
+function extractErrorMessage(err: unknown): string {
+  if (!axios.isAxiosError(err)) {
+    console.error("[TradePage] non-axios error:", err);
+    return "An unexpected error occurred. Please try again.";
+  }
+
+  console.error("[TradePage] API error:", err.response?.status, err.response?.data);
+
+  if (!err.response) {
+    return "Cannot reach the trading server. Make sure the backend is running on port 8000.";
+  }
+
+  if (err.response.status === 401) {
+    return "Your session has expired. Please log in again.";
+  }
+
+  // Backend returns: { status:"error", code:"...", message:"...", error:"..." }
+  // DRF auth errors return: { detail: "..." }
+  const data = err.response.data as Record<string, string> | undefined;
+  if (data) {
+    const msg = data.message ?? data.error ?? data.detail;
+    if (msg) return msg;
+  }
+
+  return `Request failed with status ${err.response.status}. Check the backend logs.`;
+}
+
 export default function TradePage() {
   const location = useLocation();
   const state = location.state as { ticker?: string; side?: "BUY" | "SELL" } | null;
@@ -72,6 +100,7 @@ export default function TradePage() {
         const found = holdingsRes.data.find((h) => h.ticker.toUpperCase() === ticker);
         setHolding(found ?? null);
       } catch {
+        // Quote failure is non-fatal — trade can still execute via synthetic price
         setQuote(null);
         setHolding(null);
       } finally {
@@ -96,38 +125,53 @@ export default function TradePage() {
     if (!(qty > 0)) { setError("Quantity must be greater than zero."); return; }
 
     setExecuting(true);
+
+    // ── Step 1: Execute the order ────────────────────────────────────────────
+    // This try/catch is ONLY for the order POST. Post-trade refresh is separate
+    // so a refresh failure never shows "Order failed" for a successfully filled order.
+    let filled: OrderResult | null = null;
     try {
-      const res = await client.post<OrderResult>("/orders/", { side, ticker, quantity: qty });
-      setResult(res.data);
+      const res = await client.post<OrderResult>("/orders/", {
+        side,
+        ticker,
+        quantity: qty,
+      });
+      filled = res.data;
+      console.log("[TradePage] order filled:", filled);
+
+      setResult(filled);
       setQuantity("");
 
-      // Refresh global portfolio — updates cash, Overview metrics, PortfolioPage
-      await refreshPortfolio();
-
-      // Refresh local holding display
-      const holdingsRes = await client.get<Holding[]>("/holdings/");
-      const found = holdingsRes.data.find((h) => h.ticker.toUpperCase() === ticker);
-      setHolding(found ?? null);
-
-      // Success toast
-      const filled = res.data;
+      // Success toast shown immediately — before any background refresh
       addToast(
         `${filled.side} ${fmt(filled.quantity, 4)} ${filled.ticker} @ $${fmt(filled.executed_price)} · Total $${fmt(filled.total_value)}`,
         "success",
         5000,
       );
-
       setTimeout(() => quantityRef.current?.focus(), 80);
 
     } catch (err) {
-      let msg = "Order failed. Please try again.";
-      if (axios.isAxiosError(err) && err.response?.data?.error) {
-        msg = err.response.data.error;
-      }
+      const msg = extractErrorMessage(err);
       setError(msg);
       addToast(msg, "error");
     } finally {
       setExecuting(false);
+    }
+
+    // ── Step 2: Refresh state after a successful order ───────────────────────
+    // Runs OUTSIDE the order try/catch. Any failure here is silent — the order
+    // result is already displayed and must not be overwritten with "Order failed".
+    if (filled) {
+      try {
+        // Refresh global store → updates cash in TopBar, Overview, PortfolioPage
+        await refreshPortfolio();
+        // Refresh local holding card on this page
+        const holdingsRes = await client.get<Holding[]>("/holdings/");
+        const found = holdingsRes.data.find((h) => h.ticker.toUpperCase() === ticker);
+        setHolding(found ?? null);
+      } catch {
+        // Silently ignore — order was already filled and displayed
+      }
     }
   }
 
@@ -285,7 +329,7 @@ export default function TradePage() {
               <div className={styles.summary}>
                 <div className={styles.summaryRow}>
                   <span>Execution price</span>
-                  <span>{execPrice ? `$${fmt(execPrice)}` : "Market"}</span>
+                  <span>{execPrice ? `$${fmt(execPrice)}` : "Market (synthetic)"}</span>
                 </div>
                 <div className={styles.summaryRow}>
                   <span>Estimated value</span>

@@ -31,7 +31,11 @@ function fmt(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function HistoryChart() {
+interface Props {
+  compact?: boolean;
+}
+
+export default function HistoryChart({ compact = false }: Props) {
   const [data, setData] = useState<DataPoint[]>([]);
   const [hovered, setHovered] = useState<DataPoint | null>(null);
   const [error, setError] = useState(false);
@@ -66,6 +70,34 @@ export default function HistoryChart() {
     const idx = Math.round((x / W) * (data.length - 1));
     const clamped = Math.max(0, Math.min(data.length - 1, idx));
     setHovered(data[clamped]);
+  }
+
+  if (compact) {
+    return (
+      <div className={styles.compactWrap}>
+        <div className={styles.compactSummary}>
+          <span className={`${styles.compactChange} ${positive ? styles.pos : styles.neg}`}>
+            {positive ? "+" : ""}{changePct.toFixed(2)}%
+          </span>
+          <span className={styles.compactDate}>{data[0]?.date} – {data[data.length - 1]?.date}</span>
+        </div>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          className={styles.svgCompact}
+          aria-label="30-day portfolio performance sparkline"
+        >
+          <defs>
+            <linearGradient id="chartFillCompact" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={positive ? "var(--positive)" : "var(--negative)"} stopOpacity="0.22" />
+              <stop offset="100%" stopColor={positive ? "var(--positive)" : "var(--negative)"} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={fillPath} fill="url(#chartFillCompact)" />
+          <path d={linePath} fill="none" stroke={positive ? "var(--positive)" : "var(--negative)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+    );
   }
 
   return (

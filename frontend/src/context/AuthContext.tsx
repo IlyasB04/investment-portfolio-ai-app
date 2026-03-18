@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -24,14 +24,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       "/api/auth/token/",
       { username, password }
     );
+    console.log("[AuthContext] login response:", res.status, Object.keys(res.data));
     const access = res.data.access;
+    if (!access) throw new Error("No access token in response");
+    // Store in localStorage so the API client interceptor picks it up immediately.
     localStorage.setItem(TOKEN_KEY, access);
+    // Also set on the raw axios default so any non-client calls are covered.
+    axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
     setToken(access);
-    navigate("/dashboard");
+    navigate("/overview");
   }
 
   function logout(): void {
     localStorage.removeItem(TOKEN_KEY);
+    delete axios.defaults.headers.common["Authorization"];
     setToken(null);
     navigate("/login");
   }

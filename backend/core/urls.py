@@ -4,9 +4,9 @@ from rest_framework.routers import DefaultRouter
 from .api import HoldingViewSet
 from .views import health
 from .views_import import import_csv
-from .views_market import quote, search
+from .views_market import all_prices, quote, search, single_simulated_price
 from .views_portfolio import portfolio_history, portfolio_summary
-from .views_ai import portfolio_chat
+from .views_ai import ai_health, financial_chat, portfolio_chat
 from .views_trading import place_order, recent_transactions
 
 router = DefaultRouter()
@@ -23,13 +23,17 @@ urlpatterns = [
     # Market data
     path("market/quote/<str:ticker>/", quote),
     path("market/search/", search),
+    path("market/prices/", all_prices),
+    path("market/simulate/<str:ticker>/", single_simulated_price),
 
     # Paper trading
     path("orders/", place_order),
     path("orders/transactions/", recent_transactions),
 
     # AI assistant
+    path("ai/health/", ai_health),
     path("ai/chat/", portfolio_chat),
+    path("ai/financial-chat/", financial_chat),
 
     # Holdings CRUD (router)
     path("", include(router.urls)),

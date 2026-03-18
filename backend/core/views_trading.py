@@ -8,10 +8,15 @@ Market orders only.  Execution price is resolved via:
 
 Cash and holdings are updated atomically inside a DB transaction.
 The endpoint NEVER returns a silent failure — every error path returns a
-structured JSON error body with an "error" key.
+structured JSON body:
+
+  Success (201): { "status": "filled", ... }
+  Validation (400): { "status": "error", "code": "VALIDATION_ERROR", "message": "..." }
+  Server error (500): { "status": "error", "code": "TRADE_EXECUTION_FAILED", "message": "..." }
 """
 
 import logging
+import traceback
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction as db_transaction
@@ -30,11 +35,12 @@ logger = logging.getLogger(__name__)
 def _get_account(user) -> PortfolioAccount:
     account, created = PortfolioAccount.objects.get_or_create(user=user)
     if created:
+        print(f"[TRADE] Created new PortfolioAccount for user={user.id} cash=${account.cash_balance}")
         logger.info("Created PortfolioAccount for user %s with default cash balance", user.id)
     return account
 
 
-def _parse_quantity(raw) -> tuple[Decimal | None, str | None]:
+def _parse_quantity(raw) -> "tuple[Decimal | None, str | None]":
     """Parse and validate quantity from request data. Returns (value, error_msg)."""
     try:
         qty = Decimal(str(raw))
@@ -45,6 +51,14 @@ def _parse_quantity(raw) -> tuple[Decimal | None, str | None]:
     if qty > Decimal("1_000_000"):
         return None, "quantity exceeds maximum order size of 1,000,000."
     return qty, None
+
+
+def _error(message: str, code: str = "VALIDATION_ERROR", status: int = 400) -> JsonResponse:
+    """Uniform structured error response."""
+    return JsonResponse(
+        {"status": "error", "code": code, "message": message, "error": message},
+        status=status,
+    )
 
 
 # ── Order endpoint ─────────────────────────────────────────────────────────────
@@ -75,32 +89,35 @@ def place_order(request: Request):
       "price_source":    "live" | "snapshot" | "synthetic"
     }
 
-    Error response (400)
-    --------------------
-    { "error": "human-readable message" }
+    Error response (400 / 500)
+    --------------------------
+    { "status": "error", "code": "...", "message": "...", "error": "..." }
     """
+    # ── Diagnostic: log raw request ─────────────────────────────────────────────
+    print(f"[TRADE] REQUEST body={dict(request.data)}, user={request.user.id}")
+
     # ── Input validation ────────────────────────────────────────────────────────
     side = str(request.data.get("side", "")).strip().upper()
     ticker = str(request.data.get("ticker", "")).strip().upper()
     raw_qty = request.data.get("quantity", 0)
 
     if side not in ("BUY", "SELL"):
-        return JsonResponse({"error": "side must be BUY or SELL."}, status=400)
+        return _error("side must be BUY or SELL.")
     if not ticker:
-        return JsonResponse({"error": "ticker is required."}, status=400)
+        return _error("ticker is required.")
     if len(ticker) > 20:
-        return JsonResponse({"error": "ticker symbol is too long."}, status=400)
+        return _error("ticker symbol is too long.")
 
     quantity, qty_error = _parse_quantity(raw_qty)
     if qty_error:
-        return JsonResponse({"error": qty_error}, status=400)
+        return _error(qty_error)
 
     # ── Atomic execution ────────────────────────────────────────────────────────
     try:
         with db_transaction.atomic():
             account = _get_account(request.user)
 
-            # Resolve price — this NEVER raises thanks to synthetic fallback
+            # Fetch existing holding (with row lock for safety)
             existing_holding = (
                 Holding.objects.filter(user=request.user, ticker__iexact=ticker)
                 .select_for_update()
@@ -108,8 +125,26 @@ def place_order(request: Request):
             )
             avg_cost_hint = existing_holding.average_cost if existing_holding else None
 
+            # ── Price resolution — NEVER raises, NEVER returns None ──────────────
             exec_price, price_source = get_execution_price(ticker, avg_cost_hint)
+
+            # Apply bid-ask spread for simulated prices.
+            # BUY pays the ask (mid + half-spread); SELL receives the bid (mid - half-spread).
+            # Spread is 0.05% each side — realistic for liquid US equities.
+            if price_source == "simulated_live":
+                from .simulator import BID_ASK_HALF_SPREAD
+                if side == "BUY":
+                    exec_price = exec_price * (1 + BID_ASK_HALF_SPREAD)
+                else:
+                    exec_price = exec_price * (1 - BID_ASK_HALF_SPREAD)
+                exec_price = exec_price.quantize(Decimal("0.0001"))
+
             total_value = (exec_price * quantity).quantize(Decimal("0.01"))
+
+            # ── Diagnostic: log key trade values ────────────────────────────────
+            print(f"[TRADE] EXECUTION_PRICE={exec_price} source={price_source}")
+            print(f"[TRADE] TRADE_VALUE={total_value} ({side} {quantity} {ticker})")
+            print(f"[TRADE] CASH_BEFORE={account.cash_balance}")
 
             logger.info(
                 "Order attempt: user=%s side=%s ticker=%s qty=%s price=%s source=%s",
@@ -118,16 +153,14 @@ def place_order(request: Request):
 
             if side == "BUY":
                 if account.cash_balance < total_value:
-                    return JsonResponse(
-                        {
-                            "error": (
-                                f"Insufficient cash. "
-                                f"Available: ${account.cash_balance:,.2f}, "
-                                f"required: ${total_value:,.2f}."
-                            )
-                        },
-                        status=400,
+                    msg = (
+                        f"Insufficient cash. "
+                        f"Available: ${account.cash_balance:,.2f}, "
+                        f"required: ${total_value:,.2f}."
                     )
+                    print(f"[TRADE] REJECTED insufficient_cash: {msg}")
+                    return _error(msg)
+
                 account.cash_balance -= total_value
                 account.save(update_fields=["cash_balance"])
 
@@ -152,16 +185,14 @@ def place_order(request: Request):
             else:  # SELL
                 available = existing_holding.quantity if existing_holding else Decimal(0)
                 if not existing_holding or available < quantity:
-                    return JsonResponse(
-                        {
-                            "error": (
-                                f"Insufficient holdings. "
-                                f"You hold {available:f} {ticker}, "
-                                f"tried to sell {quantity:f}."
-                            )
-                        },
-                        status=400,
+                    msg = (
+                        f"Insufficient holdings. "
+                        f"You hold {available:f} {ticker}, "
+                        f"tried to sell {quantity:f}."
                     )
+                    print(f"[TRADE] REJECTED insufficient_holdings: {msg}")
+                    return _error(msg)
+
                 account.cash_balance += total_value
                 account.save(update_fields=["cash_balance"])
 
@@ -172,6 +203,8 @@ def place_order(request: Request):
                 else:
                     existing_holding.save(update_fields=["quantity"])
                     holding = existing_holding
+
+            print(f"[TRADE] CASH_AFTER={account.cash_balance}")
 
             # Record order + transaction
             order = Order.objects.create(
@@ -207,14 +240,18 @@ def place_order(request: Request):
                 "Order filled: user=%s side=%s ticker=%s qty=%s price=%s cash_after=%s",
                 request.user.id, side, ticker, quantity, exec_price, account.cash_balance,
             )
+            print(f"[TRADE] FILLED {side} {quantity} {ticker} @ {exec_price}, cash_after={account.cash_balance}")
 
     except Exception as exc:
+        tb = traceback.format_exc()
+        print(f"[TRADE] EXCEPTION: {type(exc).__name__}: {exc}\n{tb}")
         logger.exception(
             "Unexpected error placing order: user=%s side=%s ticker=%s qty=%s",
             request.user.id, side, ticker, raw_qty,
         )
-        return JsonResponse(
-            {"error": "An unexpected error occurred. Please try again."},
+        return _error(
+            message=f"{type(exc).__name__}: {exc}",
+            code="TRADE_EXECUTION_FAILED",
             status=500,
         )
 

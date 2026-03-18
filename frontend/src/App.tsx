@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Overview from "./pages/Overview";
 import PortfolioPage from "./pages/PortfolioPage";
 import TradePage from "./pages/TradePage";
+import MarketPage from "./pages/MarketPage";
 import ImportPage from "./pages/ImportPage";
 import AssistantPage from "./pages/AssistantPage";
 import ActivityPage from "./pages/ActivityPage";
@@ -31,12 +32,13 @@ export default function App() {
               <Route path="/login" element={<Login />} />
 
               <Route element={<ProtectedShell />}>
-                <Route path="/overview"  element={<Overview />} />
-                <Route path="/portfolio" element={<PortfolioPage />} />
-                <Route path="/trade"     element={<TradePage />} />
-                <Route path="/import"    element={<ImportPage />} />
-                <Route path="/assistant" element={<AssistantPage />} />
-                <Route path="/activity"  element={<ActivityPage />} />
+                <Route path="/overview"   element={<Overview />} />
+                <Route path="/portfolio"  element={<PortfolioPage />} />
+                <Route path="/trade"      element={<TradePage />} />
+                <Route path="/market"     element={<MarketPage />} />
+                <Route path="/import"     element={<ImportPage />} />
+                <Route path="/assistant"  element={<AssistantPage />} />
+                <Route path="/activity"   element={<ActivityPage />} />
               </Route>
 
               {/* Legacy + catch-all → overview */}
@@ -44,7 +46,7 @@ export default function App() {
               <Route path="*"          element={<Navigate to="/overview" replace />} />
             </Routes>
 
-            {/* Global toast stack — rendered outside routing so it survives navigation */}
+            {/* Global toast — outside routing so it survives navigation */}
             <ToastContainer />
           </PortfolioProvider>
         </ToastProvider>

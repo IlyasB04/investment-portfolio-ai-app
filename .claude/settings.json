@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python manage.py shell -c \":*)",
+      "Bash(curl -s http://127.0.0.1:8000/api/health/ -w \"\\\\nHTTP_STATUS: %{http_code}\")",
+      "Bash(kill %1)"
+    ]
+  }
+}

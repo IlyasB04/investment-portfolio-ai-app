@@ -112,3 +112,71 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f"{self.user_id} {self.side} {self.ticker} ${self.total_value}"
+
+
+class ChatSession(models.Model):
+    """
+    One conversation thread between a user and the RAG assistant.
+    A new session is created automatically when no session_id is supplied.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="chat_sessions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        return f"Session {self.pk} / user {self.user_id}"
+
+
+class ChatMessage(models.Model):
+    """Single turn in a ChatSession — either the user question or the assistant reply."""
+
+    class Role(models.TextChoices):
+        USER = "user", "User"
+        ASSISTANT = "assistant", "Assistant"
+
+    session = models.ForeignKey(
+        ChatSession,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    role = models.CharField(max_length=10, choices=Role.choices)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return f"[{self.role}] session={self.session_id} len={len(self.content)}"
+
+
+class MarketPrice(models.Model):
+    """
+    Current simulated market price for one symbol.
+
+    The background GBM simulator writes here every TICK_INTERVAL seconds so
+    prices survive server restarts.  The in-memory cache in simulator.py is
+    always the authoritative fast-path source; this table is the persistence
+    layer and the cold-start seed loader.
+    """
+
+    symbol = models.CharField(max_length=20, unique=True, db_index=True)
+    price = models.DecimalField(max_digits=20, decimal_places=6)
+    # open_price captures the price when this symbol was first seeded so the
+    # portfolio history view can show a meaningful day-start reference.
+    open_price = models.DecimalField(max_digits=20, decimal_places=6)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["symbol"]
+
+    def __str__(self) -> str:
+        return f"{self.symbol} ${self.price}"
