@@ -6,7 +6,16 @@ from .views import health
 from .views_import import import_csv
 from .views_market import all_prices, quote, search, single_simulated_price
 from .views_portfolio import portfolio_history, portfolio_summary
-from .views_ai import ai_health, financial_chat, portfolio_chat
+from .views_ai import (
+    ai_health,
+    ai_history,
+    create_conversation,
+    list_conversations,
+    conversation_detail,
+    intelligence_chat,
+    portfolio_chat,
+    financial_chat,
+)
 from .views_trading import place_order, recent_transactions
 
 router = DefaultRouter()
@@ -30,8 +39,15 @@ urlpatterns = [
     path("orders/", place_order),
     path("orders/transactions/", recent_transactions),
 
-    # AI assistant
+    # AI assistant — multi-conversation system
     path("ai/health/", ai_health),
+    path("ai/conversations/", list_conversations),
+    path("ai/conversations/new/", create_conversation),
+    path("ai/conversations/<str:conversation_id>/messages/", conversation_detail),
+    path("ai/intelligence/", intelligence_chat),
+
+    # Legacy endpoints (backward compat)
+    path("ai/history/", ai_history),
     path("ai/chat/", portfolio_chat),
     path("ai/financial-chat/", financial_chat),
 

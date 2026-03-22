@@ -144,12 +144,108 @@ class PortfolioContext:
     unrealised_pnl_total: float = 0.0
     unrealised_pnl_pct: float = 0.0  # relative to total cost basis
 
+    # ── Drawdown / movers ─────────────────────────────────────────────────────
+    drawdown_estimate: float = 0.0         # max single-position loss% as portfolio proxy
+    largest_gainers: list[PositionDetail] = field(default_factory=list)   # top 3 by PnL%
+    largest_losers:  list[PositionDetail] = field(default_factory=list)   # bottom 3 by PnL%
+
     # ── Volatility ────────────────────────────────────────────────────────────
     volatility_proxies: dict[str, float] = field(default_factory=dict)  # {ticker: σ_annual}
     weighted_portfolio_vol: float = 0.0  # simple weighted average of position vols
 
     # ── Narrative ─────────────────────────────────────────────────────────────
     narrative: str = ""
+
+    # ── Serialisation helpers ─────────────────────────────────────────────────
+
+    def to_dict(self) -> dict:
+        """
+        Return a JSON-serialisable dict of the full portfolio context.
+        Stored in IntelligenceAuditLog.analytics_snapshot.
+        """
+        def _pos(p: PositionDetail) -> dict:
+            return {
+                "ticker":             p.ticker,
+                "quantity":           round(p.quantity, 4),
+                "average_cost":       round(p.average_cost, 4),
+                "current_price":      round(p.current_price, 4),
+                "market_value":       round(p.market_value, 2),
+                "unrealised_pnl":     round(p.unrealised_pnl, 2),
+                "unrealised_pnl_pct": round(p.unrealised_pnl_pct, 2),
+                "sector":             p.sector,
+                "annual_vol":         round(p.annual_vol_estimate, 4),
+                "price_source":       p.price_source,
+            }
+
+        return {
+            "total_equity_value":    self.total_equity_value,
+            "total_with_cash":       self.total_with_cash,
+            "cash_balance":          self.cash_balance,
+            "cash_ratio":            round(self.cash_ratio, 4),
+            "positions":             [_pos(p) for p in self.positions],
+            "allocation":            self.allocation,
+            "sector_exposure":       self.sector_exposure,
+            "hhi":                   round(self.hhi, 4),
+            "concentration_label":   self.concentration_label,
+            "unrealised_pnl_total":  self.unrealised_pnl_total,
+            "unrealised_pnl_pct":    round(self.unrealised_pnl_pct, 2),
+            "drawdown_estimate":     round(self.drawdown_estimate, 4),
+            "largest_gainers":       [_pos(p) for p in self.largest_gainers],
+            "largest_losers":        [_pos(p) for p in self.largest_losers],
+            "volatility_proxies":    self.volatility_proxies,
+            "weighted_portfolio_vol": round(self.weighted_portfolio_vol, 4),
+        }
+
+    def to_intel_prompt(self) -> str:
+        """
+        Compact text block for injection into a local LLM prompt.
+
+        Targets ~800 tokens — fits within Mistral 7B's 4096 context window
+        alongside retrieved chunks (~600 tokens) and the user question.
+        """
+        lines: list[str] = []
+        lines.append("=== PORTFOLIO SNAPSHOT ===")
+        lines.append(
+            f"Total: ${self.total_with_cash:,.0f}  "
+            f"(Equity ${self.total_equity_value:,.0f}  Cash ${self.cash_balance:,.0f} / "
+            f"{self.cash_ratio*100:.0f}%)"
+        )
+        lines.append(
+            f"P&L: {'+' if self.unrealised_pnl_total >= 0 else ''}${self.unrealised_pnl_total:,.0f}"
+            f" ({'+' if self.unrealised_pnl_pct >= 0 else ''}{self.unrealised_pnl_pct:.1f}%)"
+            f"  HHI: {self.hhi:.3f} ({self.concentration_label})"
+            f"  PortVol: ~{self.weighted_portfolio_vol*100:.0f}%/yr"
+        )
+
+        if self.positions:
+            lines.append("POSITIONS:")
+            for p in sorted(self.positions, key=lambda x: x.market_value, reverse=True):
+                sign = "+" if p.unrealised_pnl >= 0 else ""
+                lines.append(
+                    f"  {p.ticker} {p.quantity:.2f}sh @ ${p.current_price:.2f}"
+                    f" | val ${p.market_value:,.0f}"
+                    f" | pnl {sign}${p.unrealised_pnl:,.0f} ({sign}{p.unrealised_pnl_pct:.1f}%)"
+                    f" | {p.sector}"
+                )
+
+        if self.sector_exposure:
+            lines.append("SECTORS: " + "  ".join(
+                f"{s}:{w*100:.0f}%"
+                for s, w in list(self.sector_exposure.items())[:5]
+            ))
+
+        if self.largest_gainers:
+            lines.append("TOP GAINERS: " + "  ".join(
+                f"{p.ticker} +{p.unrealised_pnl_pct:.1f}%"
+                for p in self.largest_gainers
+            ))
+        if self.largest_losers:
+            lines.append("TOP LOSERS: " + "  ".join(
+                f"{p.ticker} {p.unrealised_pnl_pct:.1f}%"
+                for p in self.largest_losers
+            ))
+
+        return "\n".join(lines)
 
 
 # ── Price resolution ──────────────────────────────────────────────────────────
@@ -306,6 +402,20 @@ def build_portfolio_context(user) -> PortfolioContext:
     pnl_total = sum(p.unrealised_pnl for p in positions)
     pnl_pct_total = ((pnl_total / total_cost_basis) * 100) if total_cost_basis > 0 else 0.0
 
+    # ── Drawdown estimate + movers ────────────────────────────────────────────
+    # Use the worst single-position PnL% as a conservative drawdown proxy.
+    if positions:
+        drawdown_estimate = min(
+            (p.unrealised_pnl_pct / 100 for p in positions), default=0.0
+        )
+        sorted_by_pnl = sorted(positions, key=lambda p: p.unrealised_pnl_pct, reverse=True)
+        largest_gainers = [p for p in sorted_by_pnl[:3] if p.unrealised_pnl_pct > 0]
+        largest_losers  = [p for p in sorted_by_pnl[-3:][::-1] if p.unrealised_pnl_pct < 0]
+    else:
+        drawdown_estimate = 0.0
+        largest_gainers   = []
+        largest_losers    = []
+
     # ── Volatility proxies + weighted portfolio vol ───────────────────────────
     vol_proxies: dict[str, float] = {p.ticker: p.annual_vol_estimate for p in positions}
     if total_equity > 0:
@@ -344,6 +454,9 @@ def build_portfolio_context(user) -> PortfolioContext:
         concentration_label=conc_label,
         unrealised_pnl_total=round(pnl_total, 2),
         unrealised_pnl_pct=round(pnl_pct_total, 2),
+        drawdown_estimate=round(drawdown_estimate, 4),
+        largest_gainers=largest_gainers,
+        largest_losers=largest_losers,
         volatility_proxies={k: round(v, 4) for k, v in vol_proxies.items()},
         weighted_portfolio_vol=round(w_vol, 4),
         narrative=narrative,

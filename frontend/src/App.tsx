@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { PortfolioProvider } from "./context/PortfolioContext";
 import { ToastProvider } from "./context/ToastContext";
+import { IntelligenceProvider } from "./context/IntelligenceContext";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import AppShell from "./components/AppShell";
 import ToastContainer from "./components/ToastContainer";
@@ -28,6 +29,9 @@ export default function App() {
       <AuthProvider>
         <ToastProvider>
           <PortfolioProvider>
+            {/* IntelligenceProvider wraps all protected routes so AssistantPage
+                and AssistantSlideOver share one conversation state and session */}
+            <IntelligenceProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
 
@@ -48,6 +52,7 @@ export default function App() {
 
             {/* Global toast — outside routing so it survives navigation */}
             <ToastContainer />
+            </IntelligenceProvider>
           </PortfolioProvider>
         </ToastProvider>
       </AuthProvider>

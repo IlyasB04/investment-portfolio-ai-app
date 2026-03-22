@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -125,6 +127,10 @@ class ChatSession(models.Model):
         on_delete=models.CASCADE,
         related_name="chat_sessions",
     )
+    # Rolling memory summary updated after each turn.
+    # Tracks focus topics, discussed risks, recurring holdings so follow-up
+    # questions like "why?" work naturally across multiple turns.
+    memory_summary = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -147,15 +153,123 @@ class ChatMessage(models.Model):
         on_delete=models.CASCADE,
         related_name="messages",
     )
-    role = models.CharField(max_length=10, choices=Role.choices)
-    content = models.TextField()
+    role       = models.CharField(max_length=10, choices=Role.choices)
+    content    = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Intelligence metadata — only populated on assistant messages
+    confidence      = models.CharField(max_length=6,  blank=True, default="")
+    intent          = models.CharField(max_length=50, blank=True, default="")
+    model_used      = models.CharField(max_length=80, blank=True, default="")
+    retrieval_used  = models.BooleanField(null=True, blank=True)
+    reasoning_flags = models.JSONField(default=list)
+    sources         = models.JSONField(default=list)
 
     class Meta:
         ordering = ["created_at"]
 
     def __str__(self) -> str:
         return f"[{self.role}] session={self.session_id} len={len(self.content)}"
+
+
+class IntelligenceAuditLog(models.Model):
+    """
+    Immutable audit record for every POST /ai/intelligence/ call.
+
+    Stores the full pipeline trace so the system can be evaluated
+    academically: what was asked, what was retrieved, how confident the
+    system was, and exactly what was returned.
+    """
+
+    class Confidence(models.TextChoices):
+        HIGH   = "high",   "High"
+        MEDIUM = "medium", "Medium"
+        LOW    = "low",    "Low"
+
+    user     = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    session  = models.ForeignKey(
+        "ChatSession", null=True, blank=True, on_delete=models.SET_NULL
+    )
+    question          = models.TextField()
+    answer            = models.TextField()
+    chunk_ids         = models.JSONField(default=list)   # list[str]
+    source_labels     = models.JSONField(default=list)   # list[str]
+    confidence        = models.CharField(
+        max_length=6, choices=Confidence.choices, default=Confidence.MEDIUM
+    )
+    reasoning_flags   = models.JSONField(default=list)   # list[dict] — serialised ReasoningFlag
+    analytics_snapshot = models.JSONField(default=dict)  # PortfolioContext.to_dict() output
+    latency_ms        = models.IntegerField(default=0)
+    model_used        = models.CharField(max_length=80, default="deterministic-fallback")
+    retrieval_score   = models.FloatField(null=True, blank=True)  # top-1 cosine similarity
+    created_at        = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"AuditLog {self.pk} user={self.user_id} conf={self.confidence}"
+
+
+class Conversation(models.Model):
+    """
+    Multi-turn conversation between a user and the AI portfolio agent.
+
+    Replaces single-session ChatSession with a proper named conversation model
+    that supports multiple independent chat threads per user, title generation,
+    and rolling memory summaries for follow-up question continuity.
+    """
+
+    id             = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user           = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="conversations",
+    )
+    title          = models.CharField(max_length=200, default="New Conversation")
+    memory_summary = models.TextField(blank=True, default="")
+    last_question  = models.TextField(blank=True, default="")
+    created_at     = models.DateTimeField(auto_now_add=True)
+    updated_at     = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        return f"Conversation {self.id} / user {self.user_id}: {self.title[:40]}"
+
+
+class ConversationMessage(models.Model):
+    """Single turn within a Conversation (user question or assistant reply)."""
+
+    class Role(models.TextChoices):
+        USER      = "user",      "User"
+        ASSISTANT = "assistant", "Assistant"
+        SYSTEM    = "system",    "System"
+
+    id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    role    = models.CharField(max_length=10, choices=Role.choices)
+    content = models.TextField()
+
+    # Intelligence metadata — only populated on assistant messages
+    confidence           = models.CharField(max_length=6,  blank=True, default="")
+    intent               = models.CharField(max_length=60, blank=True, default="")
+    model_used           = models.CharField(max_length=80, blank=True, default="")
+    retrieval_used       = models.BooleanField(null=True, blank=True)
+    sources_json         = models.JSONField(default=list, blank=True)
+    reasoning_flags_json = models.JSONField(default=list, blank=True)
+    created_at           = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return f"[{self.role}] conv={self.conversation_id} len={len(self.content)}"
 
 
 class MarketPrice(models.Model):

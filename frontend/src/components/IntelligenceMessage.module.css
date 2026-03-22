@@ -1,0 +1,325 @@
+/* ═══════════════════════════════════════════════════════════════════
+   IntelligenceMessage — shared bubble component (full + compact modes)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Bubble layout ── */
+
+.bubble {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  animation: slideIn 0.22s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-md);
+  background: var(--accent-dim);
+  border: 1px solid var(--border-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-bright);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 92%;
+  min-width: 0;
+}
+
+/* ── Content wrapper ── */
+
+.content {
+  background: var(--bg-card-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  border-top-left-radius: var(--radius-xs);
+  overflow: hidden;
+}
+
+/* ── Sections ── */
+
+.section {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.sectionCompact {
+  padding: 9px 12px;
+}
+
+.sectionHead {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Markdown ── */
+
+.mdPara {
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin: 0 0 4px;
+}
+
+.mdPara:last-child { margin-bottom: 0; }
+
+.mdList {
+  margin: 4px 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+}
+
+.mdList li {
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.pre {
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0;
+}
+
+/* ── Error state ── */
+
+.errorBubble .content,
+.errorBubble .body {
+  max-width: 100%;
+}
+
+.errorText {
+  font-size: var(--text-sm);
+  color: var(--negative);
+  padding: 10px 14px;
+  background: rgba(255, 77, 79, 0.06);
+  border: 1px solid rgba(255, 77, 79, 0.22);
+  border-radius: var(--radius-lg);
+  border-top-left-radius: var(--radius-xs);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.inlineCode {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 1px 5px;
+  font-size: 11px;
+  color: var(--accent-bright);
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+/* ── Meta bar ── */
+
+.metaBar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding: 0 2px;
+}
+
+/* ── Confidence badge ── */
+
+.confBadge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  border-radius: var(--radius-full);
+  padding: 2px 7px;
+  border: 1px solid;
+}
+
+.confHigh { color: var(--positive); background: rgba(34, 212, 106, 0.10); border-color: rgba(34, 212, 106, 0.30); }
+.confMed  { color: #f5a623;         background: rgba(245, 166, 35, 0.10); border-color: rgba(245, 166, 35, 0.30); }
+.confLow  { color: var(--negative); background: rgba(255, 77, 79, 0.10);  border-color: rgba(255, 77, 79, 0.25);  }
+
+/* ── Intent badge ── */
+
+.intentBadge {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 2px 7px;
+  letter-spacing: 0.04em;
+}
+
+/* ── Model / RAG tags ── */
+
+.modelTag {
+  font-size: 9px;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 2px 7px;
+}
+
+.ragTag {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--border-glow);
+  border-radius: var(--radius-full);
+  padding: 2px 7px;
+  letter-spacing: 0.05em;
+}
+
+/* ── Reasoning flags ── */
+
+.flagsWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.flagsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: border-color var(--dur-base), color var(--dur-base);
+  width: fit-content;
+}
+
+.flagsToggle:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.flagDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f5a623;
+  flex-shrink: 0;
+}
+
+.caret { font-size: 8px; }
+
+.flagsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: slideIn 0.18s ease-out;
+}
+
+.flagItem {
+  border-radius: var(--radius-md);
+  padding: 8px 11px;
+  border-left: 3px solid;
+}
+
+.flagHigh { background: rgba(255, 77, 79, 0.07);   border-left-color: var(--negative); }
+.flagMed  { background: rgba(245, 166, 35, 0.07);  border-left-color: #f5a623; }
+.flagLow  { background: rgba(79, 142, 255, 0.06);  border-left-color: var(--accent); }
+
+.flagHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+
+.flagSev {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.flagHigh .flagSev { color: var(--negative); }
+.flagMed  .flagSev { color: #f5a623;         }
+.flagLow  .flagSev { color: var(--accent);   }
+
+.flagTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.flagExpl {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 3px;
+}
+
+.flagRec {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Sources ── */
+
+.sourcesRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.sourceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.sourceYear {
+  color: var(--text-muted);
+  font-weight: 400;
+}
