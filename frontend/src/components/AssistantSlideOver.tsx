@@ -171,8 +171,8 @@ export default function AssistantSlideOver({ open, onClose }: Props) {
         {/* Model unavailable notice */}
         {modelAvailable === false && (
           <div className={styles.modelBanner}>
-            <span>⚠ Local model offline —</span>
-            <code>ollama run mistral</code>
+            <span>⚠ Assistant unavailable —</span>
+            <span>check API key configuration</span>
             <button className={styles.bannerRetry} onClick={() => void checkModelStatus()}>
               Retry
             </button>
@@ -261,7 +261,7 @@ export default function AssistantSlideOver({ open, onClose }: Props) {
             className={styles.input}
             placeholder={
               modelAvailable === false
-                ? "Start Ollama to send messages…"
+                ? "Assistant unavailable…"
                 : "Ask about your portfolio…"
             }
             onKeyDown={handleKeyDown}

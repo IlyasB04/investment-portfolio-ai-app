@@ -15,9 +15,9 @@
  *
  * Model availability
  * ------------------
- * - Checks GET /ai/health/ on mount to determine if Ollama is running
+ * - Checks GET /ai/health/ on mount to determine if API key is configured
  * - modelAvailable: null = checking, true = ready, false = unavailable
- * - On 503 response from /ai/intelligence/ → sets modelAvailable = false
+ * - On API_AUTH_ERROR (503) from /ai/intelligence/ → sets modelAvailable = false
  *
  * Public API
  * ----------
@@ -164,10 +164,10 @@ interface IntelligenceApiResponse {
 }
 
 interface HealthApiResponse {
-  ollama_available: boolean;
-  rag_index_ready:  boolean;
-  model:            string;
-  status:           "ready" | "model_unavailable";
+  api_available:   boolean;
+  rag_index_ready: boolean;
+  model:           string;
+  status:          "ready" | "api_not_configured";
 }
 
 interface CreateConvResponse {
@@ -207,7 +207,7 @@ export function IntelligenceProvider({ children }: { children: ReactNode }) {
     try {
       const res = await client.get<HealthApiResponse>("/ai/health/");
       if (mountedRef.current) {
-        setModelAvailable(res.data.ollama_available);
+        setModelAvailable(res.data.api_available);
       }
     } catch {
       if (mountedRef.current) setModelAvailable(false);
@@ -379,20 +379,23 @@ export function IntelligenceProvider({ children }: { children: ReactNode }) {
       const serverErr = axiosErr.response?.data?.error;
       const serverMsg = axiosErr.response?.data?.message;
 
-      // Only mark model as unavailable for hard 503 (not running)
-      // A timeout (504) means Ollama is running but slow — don't flip the status dot
-      if (status === 503 && serverErr === "LOCAL_MODEL_UNAVAILABLE") {
+      // Mark assistant unavailable only on auth config errors
+      if (status === 503 && serverErr === "API_AUTH_ERROR") {
         if (mountedRef.current) setModelAvailable(false);
       }
 
       // Resolve the user-facing error text
       let errorContent: string;
-      if (status === 503) {
-        errorContent = "Local intelligence model is not running. Start Ollama with `ollama run mistral` to continue.";
-      } else if (status === 504) {
-        errorContent = "The model took too long to respond. Try a shorter or simpler question.";
-      } else if (status === 500 && serverErr === "GENERATION_ERROR") {
-        errorContent = "The model encountered an error generating a response. Please try again.";
+      if (serverErr === "API_AUTH_ERROR") {
+        errorContent = "Assistant is not configured. Contact your administrator.";
+      } else if (status === 429 || serverErr === "API_RATE_LIMIT") {
+        errorContent = "Rate limit reached. Please wait a moment and try again.";
+      } else if (status === 504 || serverErr === "MODEL_TIMEOUT") {
+        errorContent = "The assistant took too long to respond. Try a shorter question.";
+      } else if (status === 503) {
+        errorContent = "The assistant service is temporarily unavailable. Please try again.";
+      } else if (status === 500) {
+        errorContent = "The assistant encountered an error. Please try again.";
       } else {
         errorContent = serverMsg ?? serverErr ?? "Unable to generate a response. Please try again.";
       }

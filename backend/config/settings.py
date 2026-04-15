@@ -141,8 +141,9 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-# ── Local LLM ─────────────────────────────────────────────────────────────────
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
+# ── Groq API ──────────────────────────────────────────────────────────────────
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL   = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

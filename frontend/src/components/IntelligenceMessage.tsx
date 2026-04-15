@@ -187,22 +187,11 @@ interface Props {
 
 export default function IntelligenceMessage({ msg, compact }: Props) {
   if (msg.isError) {
-    const isModelDown =
-      msg.content.includes("LOCAL_MODEL_UNAVAILABLE") ||
-      msg.content.toLowerCase().includes("not running") ||
-      msg.content.toLowerCase().includes("start ollama");
     return (
       <div className={`${styles.bubble} ${styles.errorBubble}`}>
         <div className={styles.avatar}><AssistantIcon size={compact ? 12 : 14} /></div>
         <div className={styles.body}>
-          {isModelDown ? (
-            <p className={styles.errorText}>
-              Local intelligence model is not running. Start Ollama with{" "}
-              <code className={styles.inlineCode}>ollama run mistral</code> to continue.
-            </p>
-          ) : (
-            <p className={styles.errorText}>{msg.content}</p>
-          )}
+          <p className={styles.errorText}>{msg.content}</p>
         </div>
       </div>
     );

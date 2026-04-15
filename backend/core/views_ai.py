@@ -26,20 +26,21 @@ def ai_health(request):
     """
     GET /api/ai/health/
 
-    Checks Ollama availability and RAG index readiness.
+    Checks API key configuration and RAG index readiness.
+    No network call is made — key presence is the availability signal.
 
     Response
     --------
     {
-      "ollama_available": bool,
-      "rag_index_ready":  bool,
-      "model":            str,
-      "status":           "ready" | "model_unavailable"
+      "api_available":   bool,
+      "rag_index_ready": bool,
+      "model":           str,
+      "status":          "ready" | "api_not_configured"
     }
     """
-    from .services.ollama_client import is_ollama_available
+    from .services.groq_client import is_api_configured, _get_model
 
-    ollama_up = is_ollama_available()
+    api_up    = is_api_configured()
     rag_ready = False
     try:
         from .services.vector_store import get_vector_store
@@ -48,10 +49,10 @@ def ai_health(request):
         pass
 
     return JsonResponse({
-        "ollama_available": ollama_up,
-        "rag_index_ready":  rag_ready,
-        "model":            "mistral",
-        "status":           "ready" if ollama_up else "model_unavailable",
+        "api_available":   api_up,
+        "rag_index_ready": rag_ready,
+        "model":           _get_model(),
+        "status":          "ready" if api_up else "api_not_configured",
     })
 
 
@@ -256,6 +257,8 @@ def intelligence_chat(request):
             MODEL_UNAVAILABLE_ERROR,
             MODEL_TIMEOUT_ERROR,
             GENERATION_ERROR,
+            API_AUTH_ERROR,
+            API_RATE_LIMIT_ERROR,
         )
         result = generate_portfolio_intelligence(
             user            = request.user,
@@ -263,22 +266,34 @@ def intelligence_chat(request):
             conversation_id = conversation_id,
         )
 
-        if result.error == MODEL_UNAVAILABLE_ERROR:
+        if result.error == API_AUTH_ERROR:
             return JsonResponse({
-                "error":   "LOCAL_MODEL_UNAVAILABLE",
-                "message": "Local intelligence model is not running. Start Ollama to continue.",
+                "error":   "API_AUTH_ERROR",
+                "message": "Assistant API key is not configured. Contact your administrator.",
             }, status=503)
+
+        if result.error == API_RATE_LIMIT_ERROR:
+            return JsonResponse({
+                "error":   "API_RATE_LIMIT",
+                "message": "Rate limit reached. Please wait a moment and try again.",
+            }, status=429)
 
         if result.error == MODEL_TIMEOUT_ERROR:
             return JsonResponse({
                 "error":   "MODEL_TIMEOUT",
-                "message": "The model took too long to respond. Try a shorter question or restart Ollama.",
+                "message": "The assistant took too long to respond. Try a shorter question.",
             }, status=504)
+
+        if result.error == MODEL_UNAVAILABLE_ERROR:
+            return JsonResponse({
+                "error":   "SERVICE_UNAVAILABLE",
+                "message": "The assistant service is temporarily unavailable. Please try again.",
+            }, status=503)
 
         if result.error == GENERATION_ERROR:
             return JsonResponse({
                 "error":   "GENERATION_ERROR",
-                "message": "The model encountered an error generating a response. Please try again.",
+                "message": "The assistant encountered an error. Please try again.",
             }, status=500)
 
         return JsonResponse({

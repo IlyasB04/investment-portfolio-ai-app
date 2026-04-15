@@ -54,11 +54,12 @@ logger = logging.getLogger(__name__)
 
 MEMORY_TURNS     = 4        # recent turns loaded into prompt history (8 messages)
 MAX_QUESTION_LEN = 2_000
-OLLAMA_MODEL     = "mistral"
 
 MODEL_UNAVAILABLE_ERROR = "LOCAL_MODEL_UNAVAILABLE"
 MODEL_TIMEOUT_ERROR     = "MODEL_TIMEOUT"
 GENERATION_ERROR        = "GENERATION_ERROR"
+API_AUTH_ERROR          = "API_AUTH_ERROR"
+API_RATE_LIMIT_ERROR    = "API_RATE_LIMIT"
 
 
 # ── Result dataclass ───────────────────────────────────────────────────────────
@@ -405,10 +406,10 @@ def generate_portfolio_intelligence(
     question   = question.strip()[:MAX_QUESTION_LEN]
     logger.info("[intelligence] START user=%s q_len=%d", user.id, len(question))
 
-    # ── Step 0: Ollama health check ────────────────────────────────────────────
-    from .ollama_client import is_ollama_available
-    if not is_ollama_available():
-        logger.warning("[intelligence] Ollama unavailable — returning error")
+    # ── Step 0: API key presence check (no network call) ──────────────────────
+    from .groq_client import is_api_configured
+    if not is_api_configured():
+        logger.error("[intelligence] GROQ_API_KEY not configured")
         return IntelligenceResult(
             answer              = "",
             sources             = [],
@@ -421,7 +422,7 @@ def generate_portfolio_intelligence(
             retrieval_used      = False,
             intent              = "",
             memory_summary_used = False,
-            error               = MODEL_UNAVAILABLE_ERROR,
+            error               = API_AUTH_ERROR,
         )
 
     # ── Step 1: Portfolio analytics ────────────────────────────────────────────
@@ -506,9 +507,12 @@ def generate_portfolio_intelligence(
     ollama_history = list(history)
     ollama_history.append({"role": "user", "content": question})
 
-    # ── Step 9: Ollama generation ──────────────────────────────────────────────
-    from .ollama_client import (
+    # ── Step 9: Groq generation ────────────────────────────────────────────────
+    from .groq_client import (
         generate_with_history,
+        _get_model as _get_groq_model,
+        ERROR_AUTH_ERROR,
+        ERROR_RATE_LIMIT,
         ERROR_TIMEOUT,
         ERROR_UNAVAILABLE,
         ERROR_GENERATION_ERROR,
@@ -516,22 +520,26 @@ def generate_portfolio_intelligence(
     raw, error_code = generate_with_history(
         history     = ollama_history,
         system      = system_prompt,
-        model       = OLLAMA_MODEL,
         temperature = 0.15,
         max_tokens  = 400,
     )
 
     if error_code is not None or not raw:
-        # Map typed error codes to structured result errors
-        if error_code == ERROR_TIMEOUT:
+        if error_code == ERROR_AUTH_ERROR:
+            result_error = API_AUTH_ERROR
+            logger.error("[intelligence] Groq auth error — check GROQ_API_KEY")
+        elif error_code == ERROR_RATE_LIMIT:
+            result_error = API_RATE_LIMIT_ERROR
+            logger.warning("[intelligence] Groq rate limit")
+        elif error_code == ERROR_TIMEOUT:
             result_error = MODEL_TIMEOUT_ERROR
-            logger.warning("[intelligence] Ollama timed out")
+            logger.warning("[intelligence] Groq request timed out")
         elif error_code == ERROR_UNAVAILABLE:
             result_error = MODEL_UNAVAILABLE_ERROR
-            logger.warning("[intelligence] Ollama unavailable (post-health-check)")
+            logger.warning("[intelligence] Groq connection error")
         else:
             result_error = GENERATION_ERROR
-            logger.error("[intelligence] Ollama generation error: %s", error_code)
+            logger.error("[intelligence] Groq generation error: %s", error_code)
 
         return IntelligenceResult(
             answer              = "",
@@ -549,8 +557,8 @@ def generate_portfolio_intelligence(
         )
 
     answer     = raw
-    model_used = OLLAMA_MODEL
-    logger.info("[intelligence] Ollama OK len=%d", len(answer))
+    model_used = _get_groq_model()
+    logger.info("[intelligence] Groq OK len=%d", len(answer))
 
     # ── Step 10: Persist + audit ───────────────────────────────────────────────
     # Build sources list

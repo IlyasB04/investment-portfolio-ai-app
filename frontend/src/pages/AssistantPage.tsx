@@ -203,8 +203,8 @@ export default function AssistantPage() {
           }`}>
             <span className={styles.modelDot} />
             <span className={styles.modelLabel}>
-              {modelAvailable === true  ? "Ollama · mistral" :
-               modelAvailable === false ? "Model offline"    :
+              {modelAvailable === true  ? "Assistant · ready" :
+               modelAvailable === false ? "API unavailable"  :
                "Checking…"}
             </span>
             {modelAvailable === false && (
@@ -224,8 +224,8 @@ export default function AssistantPage() {
           <div className={styles.unavailableBanner}>
             <span className={styles.unavailableIcon}>⚠</span>
             <span>
-              Local intelligence model is not running.{" "}
-              <strong>Start Ollama</strong> with <code>ollama run mistral</code> to continue.
+              Assistant is unavailable. Check that{" "}
+              <strong>ANTHROPIC_API_KEY</strong> is set in the backend environment.
             </span>
             <button className={styles.bannerRetry} onClick={() => void checkModelStatus()}>
               Check again
@@ -302,7 +302,7 @@ export default function AssistantPage() {
             className={styles.input}
             placeholder={
               modelAvailable === false
-                ? "Start Ollama to send messages…"
+                ? "Assistant unavailable…"
                 : "Ask about your portfolio… (Enter to send, Shift+Enter for newline)"
             }
             onKeyDown={handleKeyDown}
