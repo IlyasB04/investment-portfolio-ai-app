@@ -379,8 +379,22 @@ export function IntelligenceProvider({ children }: { children: ReactNode }) {
       const serverErr = axiosErr.response?.data?.error;
       const serverMsg = axiosErr.response?.data?.message;
 
+      // Only mark model as unavailable for hard 503 (not running)
+      // A timeout (504) means Ollama is running but slow — don't flip the status dot
       if (status === 503 && serverErr === "LOCAL_MODEL_UNAVAILABLE") {
         if (mountedRef.current) setModelAvailable(false);
+      }
+
+      // Resolve the user-facing error text
+      let errorContent: string;
+      if (status === 503) {
+        errorContent = "Local intelligence model is not running. Start Ollama with `ollama run mistral` to continue.";
+      } else if (status === 504) {
+        errorContent = "The model took too long to respond. Try a shorter or simpler question.";
+      } else if (status === 500 && serverErr === "GENERATION_ERROR") {
+        errorContent = "The model encountered an error generating a response. Please try again.";
+      } else {
+        errorContent = serverMsg ?? serverErr ?? "Unable to generate a response. Please try again.";
       }
 
       if (mountedRef.current) {
@@ -388,7 +402,7 @@ export function IntelligenceProvider({ children }: { children: ReactNode }) {
           ...prev,
           {
             role:    "assistant",
-            content: serverMsg ?? serverErr ?? "Unable to generate a response. Please try again.",
+            content: errorContent,
             isError: true,
           },
         ]);

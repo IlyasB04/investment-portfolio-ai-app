@@ -52,11 +52,13 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-MEMORY_TURNS     = 8        # recent turns loaded into prompt history
+MEMORY_TURNS     = 4        # recent turns loaded into prompt history (8 messages)
 MAX_QUESTION_LEN = 2_000
 OLLAMA_MODEL     = "mistral"
 
 MODEL_UNAVAILABLE_ERROR = "LOCAL_MODEL_UNAVAILABLE"
+MODEL_TIMEOUT_ERROR     = "MODEL_TIMEOUT"
+GENERATION_ERROR        = "GENERATION_ERROR"
 
 
 # ── Result dataclass ───────────────────────────────────────────────────────────
@@ -74,7 +76,7 @@ class IntelligenceResult:
     retrieval_used:       bool
     intent:               str
     memory_summary_used:  bool
-    error:                Optional[str] = None   # MODEL_UNAVAILABLE_ERROR or None
+    error:                Optional[str] = None   # MODEL_UNAVAILABLE_ERROR / MODEL_TIMEOUT_ERROR / GENERATION_ERROR / None
     audit_id:             Optional[int] = None
 
 
@@ -116,44 +118,16 @@ def _update_memory_summary(
     tickers:  list[str],
 ) -> None:
     """
-    Update conversation.memory_summary after each turn.
+    Update conversation.memory_summary with a deterministic bullet after each turn.
 
-    Attempts an LLM-based summarisation for quality; falls back to a compact
-    deterministic bullet if the call fails or is too slow.
+    Deterministic-only (no second Ollama call) — keeps one generation per message.
     """
-    from .ollama_client import generate
-
-    # Build a minimal summarisation prompt
     flag_names = [f.flag_id for f in flags] if flags else []
     ticker_str = ", ".join(tickers[:5]) if tickers else "none"
     flag_str   = ", ".join(flag_names[:3]) if flag_names else "none"
 
-    summary_prompt = (
-        f"Summarise this portfolio conversation turn in ONE short bullet point (max 120 chars).\n"
-        f"User asked: {question[:150]}\n"
-        f"Intent: {intent} | Tickers: {ticker_str} | Risk flags: {flag_str}\n"
-        f"Answer excerpt: {answer[:200]}\n"
-        f"Return ONLY the bullet text, no prefix characters."
-    )
-
-    bullet: str | None = None
-    try:
-        bullet = generate(
-            prompt      = summary_prompt,
-            system      = "You produce extremely concise portfolio conversation summaries.",
-            model       = OLLAMA_MODEL,
-            temperature = 0.05,
-            max_tokens  = 80,
-        )
-    except Exception:
-        pass
-
-    if not bullet or len(bullet.strip()) < 5:
-        # Deterministic fallback summary
-        topic  = question.strip().rstrip("?").split(".")[0][:70]
-        bullet = f"{topic} [{intent}] — tickers: {ticker_str}, flags: {flag_str}"
-
-    bullet = bullet.strip().lstrip("•- ")
+    topic  = question.strip().rstrip("?").split(".")[0][:70]
+    bullet = f"{topic} [{intent}] — tickers: {ticker_str}, flags: {flag_str}"
 
     existing = conversation.memory_summary or ""
     entries  = [e for e in existing.split("\n• ") if e.strip()]
@@ -400,7 +374,7 @@ def _build_chunk_text(chunks: list[dict]) -> str:
     for i, chunk in enumerate(chunks, 1):
         score = chunk.get("score", 0.0)
         parts.append(
-            f"[{i}] {chunk['source']} (relevance {score:.2f})\n{chunk['text'][:500]}"
+            f"[{i}] {chunk['source']} (relevance {score:.2f})\n{chunk['text'][:250]}"
         )
     return "\n\n".join(parts)
 
@@ -533,23 +507,32 @@ def generate_portfolio_intelligence(
     ollama_history.append({"role": "user", "content": question})
 
     # ── Step 9: Ollama generation ──────────────────────────────────────────────
-    from .ollama_client import generate_with_history
-    answer: str
-    raw = generate_with_history(
+    from .ollama_client import (
+        generate_with_history,
+        ERROR_TIMEOUT,
+        ERROR_UNAVAILABLE,
+        ERROR_GENERATION_ERROR,
+    )
+    raw, error_code = generate_with_history(
         history     = ollama_history,
         system      = system_prompt,
         model       = OLLAMA_MODEL,
         temperature = 0.15,
-        max_tokens  = 900,
+        max_tokens  = 400,
     )
 
-    if raw:
-        answer     = raw
-        model_used = OLLAMA_MODEL
-        logger.info("[intelligence] Ollama OK len=%d", len(answer))
-    else:
-        # Ollama returned None despite health check passing — treat as error
-        logger.error("[intelligence] Ollama returned empty response")
+    if error_code is not None or not raw:
+        # Map typed error codes to structured result errors
+        if error_code == ERROR_TIMEOUT:
+            result_error = MODEL_TIMEOUT_ERROR
+            logger.warning("[intelligence] Ollama timed out")
+        elif error_code == ERROR_UNAVAILABLE:
+            result_error = MODEL_UNAVAILABLE_ERROR
+            logger.warning("[intelligence] Ollama unavailable (post-health-check)")
+        else:
+            result_error = GENERATION_ERROR
+            logger.error("[intelligence] Ollama generation error: %s", error_code)
+
         return IntelligenceResult(
             answer              = "",
             sources             = [],
@@ -562,8 +545,12 @@ def generate_portfolio_intelligence(
             retrieval_used      = retrieval_used,
             intent              = intent,
             memory_summary_used = memory_summary_used,
-            error               = MODEL_UNAVAILABLE_ERROR,
+            error               = result_error,
         )
+
+    answer     = raw
+    model_used = OLLAMA_MODEL
+    logger.info("[intelligence] Ollama OK len=%d", len(answer))
 
     # ── Step 10: Persist + audit ───────────────────────────────────────────────
     # Build sources list

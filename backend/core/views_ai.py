@@ -254,6 +254,8 @@ def intelligence_chat(request):
         from .services.intelligence import (
             generate_portfolio_intelligence,
             MODEL_UNAVAILABLE_ERROR,
+            MODEL_TIMEOUT_ERROR,
+            GENERATION_ERROR,
         )
         result = generate_portfolio_intelligence(
             user            = request.user,
@@ -266,6 +268,18 @@ def intelligence_chat(request):
                 "error":   "LOCAL_MODEL_UNAVAILABLE",
                 "message": "Local intelligence model is not running. Start Ollama to continue.",
             }, status=503)
+
+        if result.error == MODEL_TIMEOUT_ERROR:
+            return JsonResponse({
+                "error":   "MODEL_TIMEOUT",
+                "message": "The model took too long to respond. Try a shorter question or restart Ollama.",
+            }, status=504)
+
+        if result.error == GENERATION_ERROR:
+            return JsonResponse({
+                "error":   "GENERATION_ERROR",
+                "message": "The model encountered an error generating a response. Please try again.",
+            }, status=500)
 
         return JsonResponse({
             "answer":              result.answer,

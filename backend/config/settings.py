@@ -141,6 +141,9 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# ── Local LLM ─────────────────────────────────────────────────────────────────
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",

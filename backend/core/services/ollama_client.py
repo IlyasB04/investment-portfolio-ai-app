@@ -1,89 +1,113 @@
 """
-Ollama local LLM client.
+Ollama local LLM client — stabilised for demo reliability.
 
-Provides a thin, fault-tolerant wrapper around the Ollama HTTP API
-(POST /api/chat) running on localhost:11434.
+Design constraints
+------------------
+  - Hard 25-second generation timeout  (prevents thread blocking / laptop freeze)
+  - Fast 2-second health-check timeout (never delays startup)
+  - num_ctx capped at 2048             (limits KV-cache RAM; Mistral fits cleanly)
+  - Configurable model via OLLAMA_MODEL Django setting
+  - Typed error codes returned alongside content so callers can surface
+    distinct UI states (timeout ≠ offline ≠ generation failure)
 
-If Ollama is not available the functions degrade gracefully so the
-intelligence pipeline can fall back to deterministic responses rather
-than returning a 500 error.
+Error codes
+-----------
+  None              — success
+  TIMEOUT           — urlopen timed out during generation
+  UNAVAILABLE       — connection refused / Ollama not running
+  GENERATION_ERROR  — HTTP error or malformed response
 
-Usage
------
-    from .ollama_client import generate, is_ollama_available
-
-    if is_ollama_available():
-        answer = generate(prompt, system=system_prompt)
-    else:
-        answer = None   # caller handles fallback
+Hardware note
+-------------
+  Reducing num_ctx and max_tokens reduces inference RAM pressure and shortens
+  generation time. It does NOT eliminate the possibility of a laptop being too
+  slow to respond within 25 seconds — that is a hardware limitation.
+  The timeout ensures the Django thread is always released within ~26 seconds
+  regardless of model speed.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import socket
 import urllib.error
 import urllib.request
+from typing import Optional
+
+try:
+    from django.conf import settings as _django_settings
+    _DJANGO_AVAILABLE = True
+except Exception:
+    _DJANGO_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 
-OLLAMA_BASE_URL  = "http://localhost:11434"
-DEFAULT_MODEL    = "mistral"          # change to "llama3" etc. as needed
-DEFAULT_TEMP     = 0.1                # low temperature for factual, grounded answers
-REQUEST_TIMEOUT  = 60                 # seconds — local inference can be slow
-MAX_TOKENS       = 1_024              # keep responses concise for RAG usage
+OLLAMA_BASE_URL      = "http://localhost:11434"
+HEALTH_CHECK_TIMEOUT = 2     # seconds — fast probe, never delays anything
+GENERATION_TIMEOUT   = 25    # seconds — hard cap to prevent blocking / freezing
+
+# Default model — override via Django settings: OLLAMA_MODEL = "llama3.2"
+# Lighter alternatives for constrained laptops: "llama3.2", "phi3", "qwen2:1.5b"
+_DEFAULT_MODEL = "mistral"
+
+MAX_TOKENS       = 420       # keeps responses focused; reduces generation time
+NUM_CTX          = 2048      # context window cap — critical for RAM management
+DEFAULT_TEMP     = 0.1
+
+# ── Typed error codes ──────────────────────────────────────────────────────────
+
+ERROR_TIMEOUT          = "TIMEOUT"
+ERROR_UNAVAILABLE      = "UNAVAILABLE"
+ERROR_GENERATION_ERROR = "GENERATION_ERROR"
 
 
-# ── Health check ──────────────────────────────────────────────────────────────
+def _get_model() -> str:
+    """Return the configured model name, with fallback to default."""
+    if _DJANGO_AVAILABLE:
+        try:
+            return getattr(_django_settings, "OLLAMA_MODEL", _DEFAULT_MODEL)
+        except Exception:
+            pass
+    return _DEFAULT_MODEL
+
+
+# ── Health check ───────────────────────────────────────────────────────────────
 
 def is_ollama_available() -> bool:
     """
-    Return True if the Ollama server responds to a GET / health probe.
+    Fast health probe — returns within 2 seconds.
 
-    Uses a short 3-second timeout so callers aren't blocked waiting for a
-    server that isn't running.
+    Uses GET /api/tags which is lightweight (metadata only, no model loading).
+    Returns False on ANY exception so the caller never blocks.
     """
     try:
         req = urllib.request.Request(f"{OLLAMA_BASE_URL}/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=3) as resp:
+        with urllib.request.urlopen(req, timeout=HEALTH_CHECK_TIMEOUT) as resp:
             return resp.status == 200
     except Exception as exc:
         logger.debug("[ollama] health check failed: %s", exc)
         return False
 
 
-# ── Core generate call ────────────────────────────────────────────────────────
+# ── Internal _call helper ──────────────────────────────────────────────────────
 
-def generate(
-    prompt:      str,
-    system:      str = "",
-    model:       str = DEFAULT_MODEL,
-    temperature: float = DEFAULT_TEMP,
-    max_tokens:  int   = MAX_TOKENS,
-) -> str | None:
+def _call(
+    messages:    list[dict],
+    model:       str,
+    temperature: float,
+    max_tokens:  int,
+) -> tuple[Optional[str], Optional[str]]:
     """
-    Call POST /api/chat on the local Ollama server.
+    POST /api/chat and return (content, error_code).
 
-    Parameters
-    ----------
-    prompt      : The user message / question to answer.
-    system      : Optional system prompt injected as the first message.
-    model       : Ollama model tag (default: "mistral").
-    temperature : Sampling temperature [0–1].
-    max_tokens  : Maximum tokens in the generated response.
+    content    — the assistant reply, or None on failure
+    error_code — None on success, or one of the ERROR_* constants
 
-    Returns
-    -------
-    The assistant's reply string, or None if the call failed.
-    The caller is responsible for handling the None case.
+    Always returns within GENERATION_TIMEOUT seconds.
     """
-    messages: list[dict] = []
-    if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
-
     payload = {
         "model":   model,
         "messages": messages,
@@ -91,6 +115,7 @@ def generate(
         "options": {
             "temperature": temperature,
             "num_predict": max_tokens,
+            "num_ctx":     NUM_CTX,       # cap context window → less RAM pressure
         },
     }
 
@@ -103,86 +128,85 @@ def generate(
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            body = resp.read().decode("utf-8")
-            parsed = json.loads(body)
-            content: str = parsed["message"]["content"]
+        with urllib.request.urlopen(req, timeout=GENERATION_TIMEOUT) as resp:
+            body    = resp.read().decode("utf-8")
+            parsed  = json.loads(body)
+            content = parsed["message"]["content"].strip()
             logger.info(
-                "[ollama] model=%s tokens≈%d chars=%d",
+                "[ollama] OK model=%s tokens≈%d chars=%d",
                 model,
                 parsed.get("eval_count", 0),
                 len(content),
             )
-            return content.strip()
+            return content, None
+
+    except socket.timeout:
+        logger.warning("[ollama] generation timed out after %ds", GENERATION_TIMEOUT)
+        return None, ERROR_TIMEOUT
+
+    except urllib.error.URLError as exc:
+        reason = str(exc.reason)
+        if "connection refused" in reason.lower() or "connection reset" in reason.lower():
+            logger.warning("[ollama] connection refused — is Ollama running?")
+            return None, ERROR_UNAVAILABLE
+        logger.warning("[ollama] URL error: %s", reason)
+        return None, ERROR_UNAVAILABLE
 
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        logger.error("[ollama] HTTP %d — %s", exc.code, body[:300])
-        return None
-
-    except urllib.error.URLError as exc:
-        logger.warning("[ollama] connection error: %s", exc.reason)
-        return None
+        logger.error("[ollama] HTTP %d — %s", exc.code, body[:200])
+        return None, ERROR_GENERATION_ERROR
 
     except (KeyError, json.JSONDecodeError) as exc:
-        logger.error("[ollama] unexpected response format: %s", exc)
-        return None
+        logger.error("[ollama] bad response format: %s", exc)
+        return None, ERROR_GENERATION_ERROR
 
     except Exception as exc:
         logger.exception("[ollama] unexpected error: %s", exc)
-        return None
+        return None, ERROR_GENERATION_ERROR
 
 
-# ── Multi-turn generate ────────────────────────────────────────────────────────
+# ── Public API ─────────────────────────────────────────────────────────────────
 
-def generate_with_history(
-    history:     list[dict],   # [{"role": "user"|"assistant", "content": "..."}]
+def generate(
+    prompt:      str,
     system:      str = "",
-    model:       str = DEFAULT_MODEL,
+    model:       Optional[str] = None,
     temperature: float = DEFAULT_TEMP,
     max_tokens:  int   = MAX_TOKENS,
-) -> str | None:
+) -> tuple[Optional[str], Optional[str]]:
     """
-    Multi-turn variant that accepts a pre-built message history.
+    Single-turn generation.
 
-    Prepends the system prompt if provided.
+    Returns (content, error_code).
+    error_code is None on success, else one of ERROR_TIMEOUT / ERROR_UNAVAILABLE /
+    ERROR_GENERATION_ERROR.
     """
+    model = model or _get_model()
+    messages: list[dict] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    return _call(messages, model, temperature, max_tokens)
+
+
+def generate_with_history(
+    history:     list[dict],
+    system:      str = "",
+    model:       Optional[str] = None,
+    temperature: float = DEFAULT_TEMP,
+    max_tokens:  int   = MAX_TOKENS,
+) -> tuple[Optional[str], Optional[str]]:
+    """
+    Multi-turn generation.
+
+    history — list of {role, content} dicts in chronological order.
+    Returns (content, error_code).
+    """
+    model = model or _get_model()
     messages: list[dict] = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.extend(history)
-
-    payload = {
-        "model":    model,
-        "messages": messages,
-        "stream":   False,
-        "options":  {
-            "temperature": temperature,
-            "num_predict": max_tokens,
-        },
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    req  = urllib.request.Request(
-        f"{OLLAMA_BASE_URL}/api/chat",
-        data    = data,
-        headers = {"Content-Type": "application/json"},
-        method  = "POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            body    = resp.read().decode("utf-8")
-            parsed  = json.loads(body)
-            content = parsed["message"]["content"]
-            logger.info(
-                "[ollama] multi-turn model=%s turns=%d tokens≈%d",
-                model,
-                len(messages),
-                parsed.get("eval_count", 0),
-            )
-            return content.strip()
-
-    except Exception as exc:
-        logger.error("[ollama] multi-turn call failed: %s", exc)
-        return None
+    logger.info("[ollama] generate model=%s turns=%d", model, len(messages))
+    return _call(messages, model, temperature, max_tokens)
