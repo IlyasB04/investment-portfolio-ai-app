@@ -67,6 +67,16 @@ function IconActivity() {
   );
 }
 
+function IconIntelligence() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="10" cy="10" r="8"/>
+      <path d="M10 6v4l3 2"/>
+      <path d="M6 3.5L4 2M14 3.5L16 2"/>
+    </svg>
+  );
+}
+
 
 function IconLogout() {
   return (
@@ -100,13 +110,14 @@ function BrandIcon() {
 // ── Nav config ─────────────────────────────────────────────────────────────────
 
 const NAV_PRIMARY = [
-  { path: "/overview",   label: "Overview",      Icon: IconOverview },
-  { path: "/portfolio",  label: "Portfolio",     Icon: IconPortfolio },
-  { path: "/trade",      label: "Trade",         Icon: IconTrade },
-  { path: "/market",     label: "Market",        Icon: IconMarket },
-  { path: "/import",     label: "Import",        Icon: IconImport },
-  { path: "/assistant",  label: "AI Assistant",  Icon: IconAssistant },
-  { path: "/activity",   label: "Activity",      Icon: IconActivity },
+  { path: "/overview",      label: "Overview",      Icon: IconOverview },
+  { path: "/portfolio",     label: "Portfolio",     Icon: IconPortfolio },
+  { path: "/trade",         label: "Trade",         Icon: IconTrade },
+  { path: "/market",        label: "Market",        Icon: IconMarket },
+  { path: "/import",        label: "Import",        Icon: IconImport },
+  { path: "/assistant",     label: "AI Assistant",  Icon: IconAssistant },
+  { path: "/intelligence",  label: "Intelligence",  Icon: IconIntelligence },
+  { path: "/activity",      label: "Activity",      Icon: IconActivity },
 ];
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -148,6 +159,9 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
             <span className={styles.itemLabel}>{label}</span>
             {path === "/assistant" && (
               <span className={styles.badge}>AI</span>
+            )}
+            {path === "/intelligence" && (
+              <span className={styles.badge}>Live</span>
             )}
           </NavLink>
         ))}

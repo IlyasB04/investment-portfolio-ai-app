@@ -17,6 +17,7 @@ from .views_ai import (
     financial_chat,
 )
 from .views_trading import place_order, recent_transactions
+from .views_market_intelligence import market_intelligence
 
 router = DefaultRouter()
 router.register("holdings", HoldingViewSet, basename="holding")
@@ -34,6 +35,9 @@ urlpatterns = [
     path("market/search/", search),
     path("market/prices/", all_prices),
     path("market/simulate/<str:ticker>/", single_simulated_price),
+
+    # Market Intelligence
+    path("market-intelligence/", market_intelligence),
 
     # Paper trading
     path("orders/", place_order),

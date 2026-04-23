@@ -14,6 +14,7 @@ import MarketPage from "./pages/MarketPage";
 import ImportPage from "./pages/ImportPage";
 import AssistantPage from "./pages/AssistantPage";
 import ActivityPage from "./pages/ActivityPage";
+import MarketIntelligencePage from "./pages/MarketIntelligencePage";
 
 function ProtectedShell() {
   return (
@@ -41,8 +42,9 @@ export default function App() {
                 <Route path="/trade"      element={<TradePage />} />
                 <Route path="/market"     element={<MarketPage />} />
                 <Route path="/import"     element={<ImportPage />} />
-                <Route path="/assistant"  element={<AssistantPage />} />
-                <Route path="/activity"   element={<ActivityPage />} />
+                <Route path="/assistant"   element={<AssistantPage />} />
+                <Route path="/activity"    element={<ActivityPage />} />
+                <Route path="/intelligence" element={<MarketIntelligencePage />} />
               </Route>
 
               {/* Legacy + catch-all → overview */}
