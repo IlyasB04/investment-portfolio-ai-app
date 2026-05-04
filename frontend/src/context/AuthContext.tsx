@@ -24,7 +24,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       "/api/auth/token/",
       { username, password }
     );
-    console.log("[AuthContext] login response:", res.status, Object.keys(res.data));
     const access = res.data.access;
     if (!access) throw new Error("No access token in response");
     // Store in localStorage so the API client interceptor picks it up immediately.

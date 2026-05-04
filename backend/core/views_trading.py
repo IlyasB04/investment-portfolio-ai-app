@@ -16,7 +16,6 @@ structured JSON body:
 """
 
 import logging
-import traceback
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction as db_transaction
@@ -35,7 +34,6 @@ logger = logging.getLogger(__name__)
 def _get_account(user) -> PortfolioAccount:
     account, created = PortfolioAccount.objects.get_or_create(user=user)
     if created:
-        print(f"[TRADE] Created new PortfolioAccount for user={user.id} cash=${account.cash_balance}")
         logger.info("Created PortfolioAccount for user %s with default cash balance", user.id)
     return account
 
@@ -93,9 +91,6 @@ def place_order(request: Request):
     --------------------------
     { "status": "error", "code": "...", "message": "...", "error": "..." }
     """
-    # ── Diagnostic: log raw request ─────────────────────────────────────────────
-    print(f"[TRADE] REQUEST body={dict(request.data)}, user={request.user.id}")
-
     # ── Input validation ────────────────────────────────────────────────────────
     side = str(request.data.get("side", "")).strip().upper()
     ticker = str(request.data.get("ticker", "")).strip().upper()
@@ -141,11 +136,6 @@ def place_order(request: Request):
 
             total_value = (exec_price * quantity).quantize(Decimal("0.01"))
 
-            # ── Diagnostic: log key trade values ────────────────────────────────
-            print(f"[TRADE] EXECUTION_PRICE={exec_price} source={price_source}")
-            print(f"[TRADE] TRADE_VALUE={total_value} ({side} {quantity} {ticker})")
-            print(f"[TRADE] CASH_BEFORE={account.cash_balance}")
-
             logger.info(
                 "Order attempt: user=%s side=%s ticker=%s qty=%s price=%s source=%s",
                 request.user.id, side, ticker, quantity, exec_price, price_source,
@@ -158,7 +148,6 @@ def place_order(request: Request):
                         f"Available: ${account.cash_balance:,.2f}, "
                         f"required: ${total_value:,.2f}."
                     )
-                    print(f"[TRADE] REJECTED insufficient_cash: {msg}")
                     return _error(msg)
 
                 account.cash_balance -= total_value
@@ -190,7 +179,6 @@ def place_order(request: Request):
                         f"You hold {available:f} {ticker}, "
                         f"tried to sell {quantity:f}."
                     )
-                    print(f"[TRADE] REJECTED insufficient_holdings: {msg}")
                     return _error(msg)
 
                 account.cash_balance += total_value
@@ -203,8 +191,6 @@ def place_order(request: Request):
                 else:
                     existing_holding.save(update_fields=["quantity"])
                     holding = existing_holding
-
-            print(f"[TRADE] CASH_AFTER={account.cash_balance}")
 
             # Record order + transaction
             order = Order.objects.create(
@@ -240,11 +226,8 @@ def place_order(request: Request):
                 "Order filled: user=%s side=%s ticker=%s qty=%s price=%s cash_after=%s",
                 request.user.id, side, ticker, quantity, exec_price, account.cash_balance,
             )
-            print(f"[TRADE] FILLED {side} {quantity} {ticker} @ {exec_price}, cash_after={account.cash_balance}")
 
     except Exception as exc:
-        tb = traceback.format_exc()
-        print(f"[TRADE] EXCEPTION: {type(exc).__name__}: {exc}\n{tb}")
         logger.exception(
             "Unexpected error placing order: user=%s side=%s ticker=%s qty=%s",
             request.user.id, side, ticker, raw_qty,

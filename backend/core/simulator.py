@@ -294,11 +294,10 @@ def _tick() -> None:
 
     _tick_count += 1
 
-    # Print a summary line every 10 ticks (every 30 s) for easy dev visibility
     if _tick_count % 10 == 0:
         sample = sorted(new_prices.items())[:5]
         sample_str = "  ".join(f"{s}=${p:.2f}" for s, p in sample)
-        print(f"[SIMULATOR] tick #{_tick_count}  {len(new_prices)} symbols  {sample_str} ...")
+        logger.debug("[SIMULATOR] tick #%d  %d symbols  %s ...", _tick_count, len(new_prices), sample_str)
 
     # Persist outside lock so I/O doesn't stall request handlers
     _persist_batch(new_prices)
@@ -313,7 +312,6 @@ def _warm_up() -> None:
     for symbol in SEED_PRICES:
         ensure_tracked(symbol)
     logger.info("[SIMULATOR] Warm-up complete — %d symbols tracked", len(SEED_PRICES))
-    print(f"[SIMULATOR] Warm-up: {len(SEED_PRICES)} symbols initialised")
 
 
 def _run_loop() -> None:
@@ -322,7 +320,6 @@ def _run_loop() -> None:
         "[SIMULATOR] Loop started — tick every %ds, dt=%.6f",
         TICK_INTERVAL, _DT,
     )
-    print(f"[SIMULATOR] Price simulator running (tick={TICK_INTERVAL}s)")
 
     _warm_up()
 
@@ -334,7 +331,6 @@ def _run_loop() -> None:
         _stop_event.wait(timeout=TICK_INTERVAL)
 
     logger.info("[SIMULATOR] Loop stopped")
-    print("[SIMULATOR] Price simulator stopped")
 
 
 def start_scheduler() -> None:

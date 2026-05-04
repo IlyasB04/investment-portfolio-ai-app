@@ -1,16 +1,16 @@
 """
-Portfolio Intelligence Service — production local RAG agent.
+Portfolio Intelligence Service — RAG-based conversational analyst.
 
 Architecture
 ------------
-  Ollama is REQUIRED. If the local model is unavailable the pipeline
-  immediately returns a structured LOCAL_MODEL_UNAVAILABLE error.
+  Groq API is required. If the API key is missing or authentication fails,
+  the pipeline immediately returns a structured error response.
   The deterministic analytics engine (analytics.py + reasoning.py) provides
-  rich inputs TO the LLM — it is not the fallback answer generator.
+  rich portfolio context as input to the LLM.
 
 Pipeline steps
 --------------
-  0.  Ollama health check              → abort immediately if unavailable
+  0.  Groq API key check               → abort immediately if not configured
   1.  Build PortfolioContext           (analytics.py)
   2.  Classify question intent         (intent.py)
   3.  Retrieve relevant chunks         (vector_store.py, top_k = f(intent))
@@ -19,7 +19,7 @@ Pipeline steps
   6.  Inject conversation memory       (conversation.memory_summary)
   7.  Compute confidence score
   8.  Build intent-aware analyst prompt
-  9.  Call Ollama local LLM
+  9.  Call Groq LLM
   10. Persist messages + update memory summary + audit log
 
 Intent-aware prompts
@@ -37,8 +37,7 @@ Intent-aware prompts
 Memory summarisation
 ---------------------
   After each assistant reply the conversation.memory_summary is updated
-  using a compact LLM summarisation call so follow-up questions
-  ("Why?" / "What about AAPL specifically?") resolve correctly.
+  with a deterministic bullet summary so follow-up questions resolve correctly.
 """
 
 from __future__ import annotations
@@ -121,7 +120,7 @@ def _update_memory_summary(
     """
     Update conversation.memory_summary with a deterministic bullet after each turn.
 
-    Deterministic-only (no second Ollama call) — keeps one generation per message.
+    Deterministic-only — avoids a second LLM call to keep one generation per message.
     """
     flag_names = [f.flag_id for f in flags] if flags else []
     ticker_str = ", ".join(tickers[:5]) if tickers else "none"
@@ -399,8 +398,8 @@ def generate_portfolio_intelligence(
     """
     Full portfolio intelligence pipeline.
 
-    Returns IntelligenceResult with error=MODEL_UNAVAILABLE_ERROR if Ollama
-    is not running. Never raises — all exceptions are caught and logged.
+    Returns IntelligenceResult — never raises. All exceptions are caught and logged.
+    error field is set to one of the ERROR_* constants on failure.
     """
     start_time = time.monotonic()
     question   = question.strip()[:MAX_QUESTION_LEN]
@@ -503,9 +502,9 @@ def generate_portfolio_intelligence(
         intent, portfolio_prompt, chunk_text, flag_summary, memory_block
     )
 
-    # Full conversation history for multi-turn context
-    ollama_history = list(history)
-    ollama_history.append({"role": "user", "content": question})
+    # Full conversation history including the current question
+    chat_history = list(history)
+    chat_history.append({"role": "user", "content": question})
 
     # ── Step 9: Groq generation ────────────────────────────────────────────────
     from .groq_client import (
@@ -518,7 +517,7 @@ def generate_portfolio_intelligence(
         ERROR_GENERATION_ERROR,
     )
     raw, error_code = generate_with_history(
-        history     = ollama_history,
+        history     = chat_history,
         system      = system_prompt,
         temperature = 0.15,
         max_tokens  = 400,

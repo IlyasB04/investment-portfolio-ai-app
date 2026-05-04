@@ -3,12 +3,12 @@ AI Portfolio Intelligence views.
 
 Endpoints
 ---------
-  GET  /api/ai/health/                          — Ollama status + RAG index readiness
+  GET  /api/ai/health/                          — API key status + RAG index readiness
   POST /api/ai/conversations/                   — create a new named conversation
   GET  /api/ai/conversations/                   — list all conversations for the user
   GET  /api/ai/conversations/<uuid>/messages/   — load full message history
   DELETE /api/ai/conversations/<uuid>/          — delete a conversation
-  POST /api/ai/intelligence/                    — local portfolio intelligence (requires Ollama)
+  POST /api/ai/intelligence/                    — portfolio intelligence (requires Groq API key)
 """
 
 import logging
@@ -200,8 +200,8 @@ def intelligence_chat(request):
     """
     POST /api/ai/intelligence/
 
-    Requires Ollama to be running locally. Returns LOCAL_MODEL_UNAVAILABLE (503)
-    if the model is not reachable.
+    Requires GROQ_API_KEY to be configured. Returns an error response if the
+    key is missing, rate-limited, or the model fails to respond.
 
     Request body
     ------------
@@ -227,16 +227,14 @@ def intelligence_chat(request):
       "audit_id":             int | null
     }
 
-    Error (503) — Ollama not running
-    ---------------------------------
-    {
-      "error":   "LOCAL_MODEL_UNAVAILABLE",
-      "message": "Local intelligence model is not running. Start Ollama to continue."
-    }
-
-    Error (400 / 500)
-    -----------------
-    { "error": "..." }
+    Error responses
+    ---------------
+    503 API_AUTH_ERROR  — GROQ_API_KEY missing or invalid
+    429 API_RATE_LIMIT  — Groq rate limit reached
+    504 MODEL_TIMEOUT   — model took too long to respond
+    503 SERVICE_UNAVAILABLE — connection-level failure
+    500 GENERATION_ERROR — model returned an unusable response
+    400/500 { "error": "..." }
     """
     message = (request.data.get("message") or "").strip()
     if not message:

@@ -19,7 +19,6 @@ export default function Login() {
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const status = err.response?.status;
-        console.error("[Login] API error", status, err.response?.data);
         if (status === 401) {
           setError("Incorrect username or password.");
         } else if (!err.response) {
@@ -28,7 +27,6 @@ export default function Login() {
           setError(`Sign-in failed (${status ?? "unknown"}). Please try again.`);
         }
       } else {
-        console.error("[Login] unexpected error", err);
         setError("An unexpected error occurred. Please try again.");
       }
     } finally {

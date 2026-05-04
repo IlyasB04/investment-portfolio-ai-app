@@ -41,11 +41,8 @@ function fmt(v: string | number | null, dec = 2) {
 /** Extract the most useful error message from any Axios error response. */
 function extractErrorMessage(err: unknown): string {
   if (!axios.isAxiosError(err)) {
-    console.error("[TradePage] non-axios error:", err);
     return "An unexpected error occurred. Please try again.";
   }
-
-  console.error("[TradePage] API error:", err.response?.status, err.response?.data);
 
   if (!err.response) {
     return "Cannot reach the trading server. Make sure the backend is running on port 8000.";
@@ -137,8 +134,6 @@ export default function TradePage() {
         quantity: qty,
       });
       filled = res.data;
-      console.log("[TradePage] order filled:", filled);
-
       setResult(filled);
       setQuantity("");
 
