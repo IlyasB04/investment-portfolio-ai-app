@@ -52,13 +52,19 @@ GROQ_API_KEY=your_groq_api_key_here
 
 ```
 backend/
-  core/           # Models, authentication, audit logging
-  services/       # AI, forecasting, market intelligence logic
-  api/            # REST API views and serializers
+  core/
+    services/         # AI, forecasting, market intelligence logic
+    api.py            # Portfolio and holdings API
+    views_ai.py       # AI assistant endpoints
+    views_portfolio.py
+    views_trading.py
+    models.py
+    serializers.py
 
 frontend/
   src/
-    components/   # Reusable UI components
-    pages/        # Route-level page components
-    context/      # Global auth and state context
+    components/       # Reusable UI components
+    pages/            # Route-level page components
+    context/          # Global auth and state context
+    api/              # Axios client configuration
 ```

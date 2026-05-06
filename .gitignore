@@ -9,3 +9,6 @@ dist/
 
 .DS_Store
 *.log
+
+backend/db.sqlite3
+.claude/

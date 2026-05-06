@@ -374,7 +374,7 @@ def portfolio_chat(request):
 
 @api_view(["POST"])
 def financial_chat(request):
-    """POST /api/ai/financial-chat/ — legacy Claude RAG endpoint. Kept for backward compat."""
+    """POST /api/ai/financial-chat/ — legacy AI endpoint retained for backward compatibility."""
     return JsonResponse(
         {"error": "This endpoint is deprecated. Use POST /api/ai/intelligence/ instead."},
         status=410,
